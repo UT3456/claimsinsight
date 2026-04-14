@@ -1,0 +1,172 @@
+# ============================================================
+# API Gateway - Shared Application Configuration
+# ClaimInsight360 — Port 8086
+# ============================================================
+
+server:
+  port: 8086
+
+spring:
+  application:
+    name: api-gateway
+  profiles:
+    default: dev
+
+  # Force reactive web mode — required when JPA is also on the classpath
+  main:
+    web-application-type: reactive
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  # ---- Gateway routes -------------------------------------------------------
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+
+      routes:
+        # ── Data Ingestion Service (port 8082) ──────────────────────────────
+        - id: data-ingestion-feeds
+          uri: lb://data-ingestion-service
+          predicates:
+            - Path=/api/feeds/**
+
+        - id: data-ingestion-ingest
+          uri: lb://data-ingestion-service
+          predicates:
+            - Path=/api/ingest/**
+
+        # ── Claims Metrics Service (port 8083) ──────────────────────────────
+        - id: claims-metrics-kpis
+          uri: lb://claims-metrics-service
+          predicates:
+            - Path=/api/kpis/**
+
+        # ── Cost Reserve Service (port 8089) ────────────────────────────────
+        - id: cost-reserve-costs
+          uri: lb://cost-reserve-service
+          predicates:
+            - Path=/api/costs/**
+
+        - id: cost-reserve-reserves
+          uri: lb://cost-reserve-service
+          predicates:
+            - Path=/api/reserves/**
+
+        - id: cost-reserve-aging
+          uri: lb://cost-reserve-service
+          predicates:
+            - Path=/api/aging/**
+
+        # ── Adjuster & Operations Service (port 8087) ───────────────────────
+        - id: adjuster-operations-adjusters
+          uri: lb://AdjusterAndOperations
+          predicates:
+            - Path=/api/adjusters/**
+
+        - id: adjuster-operations-sla
+          uri: lb://AdjusterAndOperations
+          predicates:
+            - Path=/api/sla-violations/**
+
+        # ── Notification Service (port 8088) ────────────────────────────────
+        - id: notification-service
+          uri: lb://NotificationService
+          predicates:
+            - Path=/api/notifications/**
+
+        # ── Fraud Risk Service ───────────────────────────────────────────────
+        - id: fraud-risk-scores
+          uri: lb://fraud-risk-service
+          predicates:
+            - Path=/api/risk-scores/**
+
+        - id: fraud-risk-indicators
+          uri: lb://fraud-risk-service
+          predicates:
+            - Path=/api/risk-indicators/**
+
+        # ── Denial & Leakage Service ─────────────────────────────────────────
+        - id: denial-leakage-patterns
+          uri: lb://denial-leakage-service
+          predicates:
+            - Path=/api/denial-patterns/**
+
+        - id: denial-leakage-flags
+          uri: lb://denial-leakage-service
+          predicates:
+            - Path=/api/leakage-flags/**
+
+        # ── Analytics Report Service ─────────────────────────────────────────
+        - id: analytics-reports
+          uri: lb://analytics-report-service
+          predicates:
+            - Path=/api/reports/**
+
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods: "GET,POST,PUT,DELETE,OPTIONS"
+            allowedHeaders: "*"
+
+# ---- Eureka client registration -------------------------------------------
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+# ---- JWT configuration ----------------------------------------------------
+application:
+  security:
+    jwt:
+      secret-key: 5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437
+      expiration: 86400000
+
+# ---- Actuator + Zipkin (single management block) --------------------------
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,metrics,gateway"
+  endpoint:
+    health:
+      show-details: always
+  info:
+    env:
+      enabled: true
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans
+  tracing:
+    sampling:
+      probability: 1.0
+
+info:
+  app:
+    name: API Gateway
+    description: ClaimInsight360 - API Gateway with Embedded Identity Module
+    version: 1.0.0
+
+# ---- Logging ----------------------------------------------------------------
+logging:
+  level:
+    com.claiminsight.gateway: INFO
+    org.springframework.cloud.gateway: INFO
+    org.springframework.security: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

@@ -1,0 +1,14 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="10 - Analytics Report Service" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="analytics-report-service" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.claims.AnalyticsReportServiceApplication" />
+    <option name="ACTIVE_PROFILES" value="" />
+    <option name="PROGRAM_PARAMETERS" value="" />
+    <option name="VM_PARAMETERS" value="-Xms128m -Xmx256m" />
+    <option name="WORKING_DIRECTORY" value="$MODULE_WORKING_DIR$" />
+    <option name="ENABLE_LAUNCH_OPTIMIZATION" value="true" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

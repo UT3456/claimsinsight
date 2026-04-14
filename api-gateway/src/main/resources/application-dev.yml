@@ -1,0 +1,27 @@
+# ============================================================
+# Development Profile Configuration
+# Active profile: dev
+# ============================================================
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/claiminsight_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+  devtools:
+    restart:
+      enabled: true
+    livereload:
+      enabled: true
+
+logging:
+  level:
+    com.claiminsight.gateway: DEBUG
+    org.springframework.cloud.gateway: DEBUG

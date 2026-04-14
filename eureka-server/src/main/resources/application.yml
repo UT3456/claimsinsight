@@ -1,0 +1,60 @@
+# ============================================================
+# Eureka Server - Shared Application Configuration
+# ClaimInsight360 Service Registry
+# ============================================================
+
+server:
+  port: 8761
+
+spring:
+  application:
+    name: eureka-server
+  profiles:
+    default: dev
+
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    register-with-eureka: false
+    fetch-registry: false
+    service-url:
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+  server:
+    wait-time-in-ms-when-sync-empty: 0
+    enable-self-preservation: false
+    eviction-interval-timer-in-ms: 5000
+
+# ---- Actuator + Zipkin (single management block) --------------------------
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,metrics"
+  endpoint:
+    health:
+      show-details: always
+  info:
+    env:
+      enabled: true
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans
+  tracing:
+    sampling:
+      probability: 1.0
+
+info:
+  app:
+    name: Eureka Server
+    description: ClaimInsight360 - Service Registry
+    version: 1.0.0
+
+# ---- Logging ----------------------------------------------------------------
+logging:
+  level:
+    com.claiminsight.eureka: INFO
+    com.netflix.eureka: WARN
+    com.netflix.discovery: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

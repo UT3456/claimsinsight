@@ -1,0 +1,11 @@
+${AnsiColor.BRIGHT_YELLOW}
+    ___    ____  ____   ______      __
+   /   |  / __ \/  _/  / ____/___ _/ /____  _      ______ ___  __
+  / /| | / /_/ // /   / / __/ __ `/ __/ _ \| | /| / / __ `/ / / /
+ / ___ |/ ____// /   / /_/ / /_/ / /_/  __/| |/ |/ / /_/ / /_/ /
+/_/  |_/_/   /___/   \____/\__,_/\__/\___/ |__/|__/\__,_/\__, /
+                                                          /____/
+${AnsiColor.YELLOW}
+          ClaimInsight360 — API Gateway + Identity Module
+          Port: 8080  |  Auth: /api/auth  |  Registry: :8761
+${AnsiColor.DEFAULT}

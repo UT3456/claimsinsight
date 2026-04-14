@@ -1,0 +1,160 @@
+package com.claim360.denialleakage.service;
+
+import com.claim360.denialleakage.client.FraudRiskServiceClient;
+import com.claim360.denialleakage.client.dto.FraudRiskScoreDTO;
+import com.claim360.denialleakage.dto.LeakageFlagRequest;
+import com.claim360.denialleakage.dto.LeakageFlagResponse;
+import com.claim360.denialleakage.entity.LeakageFlag;
+import com.claim360.denialleakage.enums.LeakageType;
+import com.claim360.denialleakage.exception.ResourceNotFoundException;
+import com.claim360.denialleakage.repository.LeakageFlagRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.modelmapper.ModelMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * Service implementation for LeakageFlag operations.
+ * Uses ModelMapper for Entity to DTO conversion.
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+@Transactional
+public class LeakageFlagServiceImpl implements LeakageFlagService {
+
+    private final LeakageFlagRepository leakageFlagRepository;
+    private final ModelMapper modelMapper;
+
+    /** Optional: null when fraud-risk-service is unreachable. Cross-reference is non-blocking. */
+    @Autowired(required = false)
+    private FraudRiskServiceClient fraudRiskServiceClient;
+
+    @Override
+    public LeakageFlagResponse createLeakageFlag(LeakageFlagRequest request) {
+        log.info("Creating LeakageFlag for claimId: {}", request.getClaimId());
+
+        // Cross-reference fraud risk scores for this claim before flagging leakage
+        if (fraudRiskServiceClient != null) {
+            try {
+                List<FraudRiskScoreDTO> riskScores = fraudRiskServiceClient.getRiskScoresByClaimId(request.getClaimId());
+                if (!riskScores.isEmpty()) {
+                    double maxScore = riskScores.stream()
+                            .mapToDouble(FraudRiskScoreDTO::getScoreValue)
+                            .max()
+                            .orElse(0.0);
+                    log.info("Fraud risk cross-reference for claimId {}: {} score(s) found, max score={}",
+                            request.getClaimId(), riskScores.size(), maxScore);
+                }
+            } catch (Exception ex) {
+                log.debug("Could not fetch fraud risk scores for claimId {} — fraud-risk-service may be unavailable", request.getClaimId());
+            }
+        }
+
+        LeakageFlag flag = modelMapper.map(request, LeakageFlag.class);
+        LeakageFlag saved = leakageFlagRepository.save(flag);
+        log.info("LeakageFlag created with ID: {}", saved.getLeakageId());
+        return modelMapper.map(saved, LeakageFlagResponse.class);
+    }
+
+    @Override
+    public LeakageFlagResponse getLeakageFlagById(Long leakageId) {
+        log.info("Fetching LeakageFlag with ID: {}", leakageId);
+        LeakageFlag flag = leakageFlagRepository.findById(leakageId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "LeakageFlag", "leakageId", leakageId));
+        return modelMapper.map(flag, LeakageFlagResponse.class);
+    }
+
+    @Override
+    public List<LeakageFlagResponse> getAllLeakageFlags() {
+        log.info("Fetching all LeakageFlags");
+        return leakageFlagRepository.findAll()
+                .stream()
+                .map(flag -> modelMapper.map(flag, LeakageFlagResponse.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<LeakageFlagResponse> getLeakageFlagsByClaimId(String claimId) {
+        log.info("Fetching LeakageFlags for claimId: {}", claimId);
+        List<LeakageFlag> flags = leakageFlagRepository.findByClaimId(claimId);
+        if (flags.isEmpty()) {
+            throw new ResourceNotFoundException("LeakageFlag", "claimId", claimId);
+        }
+        return flags.stream()
+                .map(flag -> modelMapper.map(flag, LeakageFlagResponse.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<LeakageFlagResponse> getLeakageFlagsByLeakageType(LeakageType leakageType) {
+        log.info("Fetching LeakageFlags by type: {}", leakageType);
+        List<LeakageFlag> flags = leakageFlagRepository.findByLeakageType(leakageType);
+        if (flags.isEmpty()) {
+            throw new ResourceNotFoundException("LeakageFlag", "leakageType", leakageType);
+        }
+        return flags.stream()
+                .map(flag -> modelMapper.map(flag, LeakageFlagResponse.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<LeakageFlagResponse> getLeakageFlagsByEstimatedLoss(Double amount) {
+        log.info("Fetching LeakageFlags above estimated loss: {}", amount);
+        List<LeakageFlag> flags = leakageFlagRepository
+                .findByEstimatedLossGreaterThanEqual(amount);
+        if (flags.isEmpty()) {
+            throw new ResourceNotFoundException(
+                    "LeakageFlag", "estimatedLoss >= ", amount);
+        }
+        return flags.stream()
+                .map(flag -> modelMapper.map(flag, LeakageFlagResponse.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<LeakageFlagResponse> getLeakageFlagsByClaimIdAndLeakageType(
+            String claimId, LeakageType leakageType) {
+        log.info("Fetching LeakageFlags by claimId: {} and type: {}", claimId, leakageType);
+        List<LeakageFlag> flags = leakageFlagRepository
+                .findByClaimIdAndLeakageType(claimId, leakageType);
+        if (flags.isEmpty()) {
+            throw new ResourceNotFoundException(
+                    "LeakageFlag", "claimId and leakageType",
+                    claimId + " / " + leakageType);
+        }
+        return flags.stream()
+                .map(flag -> modelMapper.map(flag, LeakageFlagResponse.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public LeakageFlagResponse updateLeakageFlag(Long leakageId,
+                                                 LeakageFlagRequest request) {
+        log.info("Updating LeakageFlag with ID: {}", leakageId);
+        LeakageFlag existing = leakageFlagRepository.findById(leakageId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "LeakageFlag", "leakageId", leakageId));
+        modelMapper.map(request, existing);
+        existing.setLeakageId(leakageId);
+        LeakageFlag updated = leakageFlagRepository.save(existing);
+        log.info("LeakageFlag updated with ID: {}", updated.getLeakageId());
+        return modelMapper.map(updated, LeakageFlagResponse.class);
+    }
+
+    @Override
+    public void deleteLeakageFlag(Long leakageId) {
+        log.info("Deleting LeakageFlag with ID: {}", leakageId);
+        LeakageFlag existing = leakageFlagRepository.findById(leakageId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "LeakageFlag", "leakageId", leakageId));
+        leakageFlagRepository.delete(existing);
+        log.info("LeakageFlag deleted with ID: {}", leakageId);
+    }
+}

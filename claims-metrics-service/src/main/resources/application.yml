@@ -1,0 +1,81 @@
+# ============================================================
+# Claims Metrics Service - Shared Application Configuration
+# ClaimInsight360 Microservice 3
+# ============================================================
+
+server:
+  port: 8083
+
+spring:
+  application:
+    name: claims-metrics-service
+  profiles:
+    default: dev
+
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  sql:
+    init:
+      mode: never
+
+  cache:
+    type: simple
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+
+# ---- Eureka ---------------------------------------------------------------
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+# ---- Actuator + Zipkin (single management block) --------------------------
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+    httpexchanges:
+      enabled: true
+  info:
+    env:
+      enabled: true
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans
+  tracing:
+    sampling:
+      probability: 1.0
+
+info:
+  app:
+    name: Claims Metrics Service
+    description: ClaimInsight360 - Microservice 3 - Claims Metrics Engine
+    version: 1.0.0
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# ---- Logging ----------------------------------------------------------------
+logging:
+  level:
+    com.claiminsight.metrics.aspect: INFO
+    com.claiminsight.metrics: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

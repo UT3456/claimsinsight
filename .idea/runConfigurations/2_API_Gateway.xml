@@ -1,0 +1,14 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="2 - API Gateway" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="api-gateway" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.claiminsight.gateway.ApiGatewayApplication" />
+    <option name="ACTIVE_PROFILES" value="dev" />
+    <option name="PROGRAM_PARAMETERS" value="" />
+    <option name="VM_PARAMETERS" value="-Xms128m -Xmx256m" />
+    <option name="WORKING_DIRECTORY" value="$MODULE_WORKING_DIR$" />
+    <option name="ENABLE_LAUNCH_OPTIMIZATION" value="true" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

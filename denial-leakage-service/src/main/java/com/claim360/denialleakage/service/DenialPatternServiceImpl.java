@@ -1,0 +1,132 @@
+package com.claim360.denialleakage.service;
+
+import com.claim360.denialleakage.dto.DenialPatternRequest;
+import com.claim360.denialleakage.dto.DenialPatternResponse;
+import com.claim360.denialleakage.entity.DenialPattern;
+import com.claim360.denialleakage.exception.ResourceNotFoundException;
+import com.claim360.denialleakage.repository.DenialPatternRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.modelmapper.ModelMapper;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+@Transactional
+public class DenialPatternServiceImpl implements DenialPatternService {
+
+    private final DenialPatternRepository denialPatternRepository;
+    private final ModelMapper modelMapper;
+
+    @Override
+    public DenialPatternResponse createDenialPattern(DenialPatternRequest request) {
+        log.info("Creating DenialPattern for claimId: {}", request.getClaimId());
+        DenialPattern pattern = modelMapper.map(request, DenialPattern.class);
+        DenialPattern saved = denialPatternRepository.save(pattern);
+        log.info("DenialPattern created with ID: {}", saved.getPatternId());
+        return modelMapper.map(saved, DenialPatternResponse.class);
+    }
+
+    @Override
+    public DenialPatternResponse getDenialPatternById(Long patternId) {
+        log.info("Fetching DenialPattern with ID: {}", patternId);
+        DenialPattern pattern = denialPatternRepository.findById(patternId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "DenialPattern", "patternId", patternId));
+        return modelMapper.map(pattern, DenialPatternResponse.class);
+    }
+
+    @Override
+    public List<DenialPatternResponse> getAllDenialPatterns() {
+        log.info("Fetching all DenialPatterns");
+        return denialPatternRepository.findAll()
+                .stream()
+                .map(pattern -> modelMapper.map(pattern, DenialPatternResponse.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<DenialPatternResponse> getDenialPatternsByClaimId(String claimId) {
+        log.info("Fetching DenialPatterns for claimId: {}", claimId);
+        List<DenialPattern> patterns = denialPatternRepository.findByClaimId(claimId);
+        if (patterns.isEmpty()) {
+            throw new ResourceNotFoundException("DenialPattern", "claimId", claimId);
+        }
+        return patterns.stream()
+                .map(pattern -> modelMapper.map(pattern, DenialPatternResponse.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<DenialPatternResponse> getDenialPatternsByDenialCode(String denialCode) {
+        log.info("Fetching DenialPatterns by denialCode: {}", denialCode);
+        List<DenialPattern> patterns = denialPatternRepository.findByDenialCode(denialCode);
+        if (patterns.isEmpty()) {
+            throw new ResourceNotFoundException("DenialPattern", "denialCode", denialCode);
+        }
+        return patterns.stream()
+                .map(pattern -> modelMapper.map(pattern, DenialPatternResponse.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<DenialPatternResponse> getDenialPatternsByReasonKeyword(String keyword) {
+        log.info("Fetching DenialPatterns by keyword: {}", keyword);
+        List<DenialPattern> patterns = denialPatternRepository
+                .findByReasonContainingIgnoreCase(keyword);
+        if (patterns.isEmpty()) {
+            throw new ResourceNotFoundException(
+                    "DenialPattern", "reason containing", keyword);
+        }
+        return patterns.stream()
+                .map(pattern -> modelMapper.map(pattern, DenialPatternResponse.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<DenialPatternResponse> getDenialPatternsByClaimIdAndDenialCode(
+            String claimId, String denialCode) {
+        log.info("Fetching DenialPatterns by claimId: {} and denialCode: {}",
+                claimId, denialCode);
+        List<DenialPattern> patterns = denialPatternRepository
+                .findByClaimIdAndDenialCode(claimId, denialCode);
+        if (patterns.isEmpty()) {
+            throw new ResourceNotFoundException(
+                    "DenialPattern", "claimId and denialCode",
+                    claimId + " / " + denialCode);
+        }
+        return patterns.stream()
+                .map(pattern -> modelMapper.map(pattern, DenialPatternResponse.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public DenialPatternResponse updateDenialPattern(Long patternId,
+                                                     DenialPatternRequest request) {
+        log.info("Updating DenialPattern with ID: {}", patternId);
+        DenialPattern existing = denialPatternRepository.findById(patternId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "DenialPattern", "patternId", patternId));
+        modelMapper.map(request, existing);
+        existing.setPatternId(patternId);
+        DenialPattern updated = denialPatternRepository.save(existing);
+        log.info("DenialPattern updated with ID: {}", updated.getPatternId());
+        return modelMapper.map(updated, DenialPatternResponse.class);
+    }
+
+    @Override
+    public void deleteDenialPattern(Long patternId) {
+        log.info("Deleting DenialPattern with ID: {}", patternId);
+        DenialPattern existing = denialPatternRepository.findById(patternId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "DenialPattern", "patternId", patternId));
+        denialPatternRepository.delete(existing);
+        log.info("DenialPattern deleted with ID: {}", patternId);
+    }
+}

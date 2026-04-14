@@ -1,0 +1,13 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="7 - Adjuster and Operations" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <option name="ALTERNATIVE_JRE_PATH" value="21" />
+    <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
+    <module name="AdjusterAndOperations (1)" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.demo.AdjusterAndOperationsApplication" />
+    <option name="VM_PARAMETERS" value="-Xms128m -Xmx256m" />
+    <option name="WORKING_DIRECTORY" value="file://$MODULE_WORKING_DIR$" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

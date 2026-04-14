@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="8 - Cost Reserve Service" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="cost-reserve-service" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.claims.CostReserveServiceApplication" />
+    <option name="VM_PARAMETERS" value="-Xms128m -Xmx256m" />
+    <option name="WORKING_DIRECTORY" value="file://$MODULE_WORKING_DIR$" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

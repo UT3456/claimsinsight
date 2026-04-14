@@ -1,0 +1,433 @@
+{
+  "info": {
+    "name": "ClaimInsight360 - API Gateway",
+    "_postman_id": "claiminsight360-collection",
+    "description": "Complete test collection for ClaimInsight360 API Gateway (port 8080). Run requests in order: Register → Login → copy token → test protected routes.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url",  "value": "http://localhost:8086" },
+    { "key": "token",     "value": "" },
+    { "key": "admin_token", "value": "" }
+  ],
+  "item": [
+
+    {
+      "name": "🔐 Identity & Auth",
+      "item": [
+
+        {
+          "name": "Register User (ROLE_USER)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.accessToken) { pm.collectionVariables.set('token', res.accessToken); }",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Token present', () => pm.expect(res.accessToken).to.be.a('string'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"analyst01\",\n  \"email\": \"analyst01@claiminsight.com\",\n  \"password\": \"Pass@1234\",\n  \"role\": \"ROLE_ANALYST\"\n}"
+            }
+          }
+        },
+
+        {
+          "name": "Register Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.accessToken) { pm.collectionVariables.set('admin_token', res.accessToken); }",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"email\": \"admin@claiminsight.com\",\n  \"password\": \"Admin@1234\",\n  \"role\": \"ROLE_ADMIN\"\n}"
+            }
+          }
+        },
+
+        {
+          "name": "Register - Duplicate Username (expect 409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"analyst01\",\n  \"email\": \"other@claiminsight.com\",\n  \"password\": \"Pass@1234\"\n}"
+            }
+          }
+        },
+
+        {
+          "name": "Register - Validation Error (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"ab\",\n  \"email\": \"not-an-email\",\n  \"password\": \"123\"\n}"
+            }
+          }
+        },
+
+        {
+          "name": "Login (Analyst)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.accessToken) { pm.collectionVariables.set('token', res.accessToken); }",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Token present', () => pm.expect(res.accessToken).to.be.a('string'));",
+                  "pm.test('Token type is Bearer', () => pm.expect(res.tokenType).to.eql('Bearer'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"analyst01\",\n  \"password\": \"Pass@1234\"\n}"
+            }
+          }
+        },
+
+        {
+          "name": "Login (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.accessToken) { pm.collectionVariables.set('admin_token', res.accessToken); }",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"Admin@1234\"\n}"
+            }
+          }
+        },
+
+        {
+          "name": "Login - Wrong Password (expect 401)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"analyst01\",\n  \"password\": \"WrongPassword\"\n}"
+            }
+          }
+        }
+
+      ]
+    },
+
+    {
+      "name": "📊 Audit Logs (Admin Only)",
+      "item": [
+
+        {
+          "name": "Get All Audit Logs",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/audit/logs?page=0&size=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "audit", "logs"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          }
+        },
+
+        {
+          "name": "Get Audit Logs by User",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/audit/logs/user/analyst01?page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "audit", "logs", "user", "analyst01"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          }
+        },
+
+        {
+          "name": "Get Audit Logs by Action - LOGIN_SUCCESS",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/audit/logs/action/LOGIN_SUCCESS?page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "audit", "logs", "action", "LOGIN_SUCCESS"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          }
+        },
+
+        {
+          "name": "Get Audit Logs by Action - LOGIN_FAILED",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": "{{base_url}}/api/audit/logs/action/LOGIN_FAILED"
+          }
+        },
+
+        {
+          "name": "Get Audit Logs by Date Range",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/audit/logs/range?from=2026-01-01T00:00:00&to=2026-12-31T23:59:59&page=0&size=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "audit", "logs", "range"],
+              "query": [
+                { "key": "from", "value": "2026-01-01T00:00:00" },
+                { "key": "to",   "value": "2026-12-31T23:59:59" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          }
+        },
+
+        {
+          "name": "Audit Logs - Non-Admin Access (expect 403)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/api/audit/logs"
+          }
+        }
+
+      ]
+    },
+
+    {
+      "name": "📥 Data Ingestion Service (via Gateway)",
+      "item": [
+
+        {
+          "name": "Create Data Feed",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/feeds",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"feedType\": \"CLAIM\",\n  \"sourceSystem\": \"CoreClaims-v2\",\n  \"status\": \"ACTIVE\"\n}"
+            }
+          }
+        },
+
+        {
+          "name": "Get All Data Feeds",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/api/feeds"
+          }
+        },
+
+        {
+          "name": "Get Data Feed by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/api/feeds/1"
+          }
+        },
+
+        {
+          "name": "Ingest Claim",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/ingest",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claimId\": \"CLM-2026-001\",\n  \"feedId\": 1,\n  \"payloadJson\": \"{\\\"amount\\\":5000,\\\"type\\\":\\\"medical\\\"}\"\n}"
+            }
+          }
+        },
+
+        {
+          "name": "Get All Raw Claims",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/api/ingest/raw-claims"
+          }
+        },
+
+        {
+          "name": "No Token - Expect 401",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/feeds"
+          }
+        }
+
+      ]
+    },
+
+    {
+      "name": "📈 Claims Metrics Service (via Gateway)",
+      "item": [
+
+        {
+          "name": "Create KPI",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{base_url}}/api/kpis",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claimId\": \"CLM-2026-001\",\n  \"metricName\": \"TAT\",\n  \"metricValue\": 12.5,\n  \"metricDate\": \"2026-04-10\"\n}"
+            }
+          }
+        },
+
+        {
+          "name": "Get All KPIs",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/api/kpis"
+          }
+        },
+
+        {
+          "name": "Get KPI by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/api/kpis/1"
+          }
+        },
+
+        {
+          "name": "Get KPIs by Claim ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/api/kpis/claim/CLM-2026-001"
+          }
+        },
+
+        {
+          "name": "Get KPIs by Metric Name",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/api/kpis/metric/TAT"
+          }
+        },
+
+        {
+          "name": "Calculate KPI for Claim",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{base_url}}/api/kpis/calculate/CLM-2026-001"
+          }
+        }
+
+      ]
+    },
+
+    {
+      "name": "❤️ Health & Infrastructure",
+      "item": [
+
+        {
+          "name": "Gateway Health",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/actuator/health"
+          }
+        },
+
+        {
+          "name": "Gateway Info",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/actuator/info"
+          }
+        },
+
+        {
+          "name": "Eureka Dashboard (direct)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8761"
+          }
+        }
+
+      ]
+    }
+
+  ]
+}

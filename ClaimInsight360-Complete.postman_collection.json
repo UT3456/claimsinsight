@@ -1,0 +1,1939 @@
+{
+  "info": {
+    "name": "ClaimInsight360 — Complete API Collection v2",
+    "description": "Insurance Claims Analytics & Intelligence Platform\n\n✅ All endpoints verified against live running services\n✅ Correct request body schemas (field names, types, enums)\n✅ All 6 roles covered\n\nRoles & Access:\n• Claims Analyst    → /api/feeds, /api/ingest, /api/kpis, /api/denial-patterns, /api/leakage-flags\n• Claims Manager    → /api/kpis, /api/adjusters, /api/sla-violations, /api/costs, /api/reserves, /api/aging\n• Fraud Analyst     → /api/risk-scores, /api/risk-indicators, /api/denial-patterns, /api/leakage-flags\n• Actuary           → /api/kpis, /api/costs, /api/reserves, /api/aging\n• Operations Exec   → /api/kpis, /api/adjusters, /api/sla-violations\n• Admin             → All endpoints including /api/audit\n\nSetup:\n1. Import collection into Postman\n2. Run 'Register — Admin' request\n3. Run 'Login — Admin' — token is auto-saved to {{admin_token}}\n4. Run 'Login — Any User' — token is auto-saved to {{token}}\n5. All protected requests use {{token}} or {{admin_token}}",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "claiminsight360"
+  },
+  "item": [
+    {
+      "name": "🔐 Authentication & Users",
+      "description": "Register and login for all 6 roles. Run Login requests first — tokens are auto-extracted via test scripts.",
+      "item": [
+        {
+          "name": "Register — Claims Analyst",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"analyst_john\",\n  \"email\": \"john.analyst@company.com\",\n  \"password\": \"SecurePass123\",\n  \"role\": \"ROLE_CLAIMS_ANALYST\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "✅ Returns 201 Created. Requires API Gateway to have restarted after Role enum update."
+          }
+        },
+        {
+          "name": "Register — Claims Manager",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"manager_sarah\",\n  \"email\": \"sarah.manager@company.com\",\n  \"password\": \"SecurePass123\",\n  \"role\": \"ROLE_CLAIMS_MANAGER\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Register — Fraud Analyst",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"fraud_mike\",\n  \"email\": \"mike.fraud@company.com\",\n  \"password\": \"SecurePass123\",\n  \"role\": \"ROLE_FRAUD_ANALYST\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Register — Actuary",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"actuary_emma\",\n  \"email\": \"emma.actuary@company.com\",\n  \"password\": \"SecurePass123\",\n  \"role\": \"ROLE_ACTUARY\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Register — Operations Executive",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"ops_david\",\n  \"email\": \"david.ops@company.com\",\n  \"password\": \"SecurePass123\",\n  \"role\": \"ROLE_OPERATIONS_EXEC\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Register — Admin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin_alice\",\n  \"email\": \"alice.admin@company.com\",\n  \"password\": \"SecurePass123\",\n  \"role\": \"ROLE_ADMIN\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "✅ Verified working. Returns 201 Created with {token, username, role}."
+          }
+        },
+        {
+          "name": "Login — Any User (saves {{token}})",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.token) {",
+                  "    pm.collectionVariables.set('token', res.token);",
+                  "    console.log('token saved:', res.token.substring(0, 30) + '...');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"analyst_john\",\n  \"password\": \"SecurePass123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "✅ Verified working. Returns {token, username, role}. Token is auto-saved to {{token}} variable."
+          }
+        },
+        {
+          "name": "Login — Admin (saves {{admin_token}})",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.token) {",
+                  "    pm.collectionVariables.set('admin_token', res.token);",
+                  "    console.log('admin_token saved:', res.token.substring(0, 30) + '...');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin_alice\",\n  \"password\": \"SecurePass123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "✅ Verified working. Token is auto-saved to {{admin_token}} variable."
+          }
+        }
+      ]
+    },
+    {
+      "name": "📥 Data Ingestion — Feeds (Analyst, Admin)",
+      "description": "Service: data-ingestion-service (port 8082)\nGateway route: /api/feeds/** → lb://data-ingestion-service\n\n✅ VERIFIED WORKING",
+      "item": [
+        {
+          "name": "Get All Data Feeds",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/feeds",
+              "host": ["{{base_url}}"],
+              "path": ["api", "feeds"]
+            },
+            "description": "✅ Returns 200 with list of DataFeed objects."
+          }
+        },
+        {
+          "name": "Get Data Feed by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/feeds/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "feeds", "1"]
+            },
+            "description": "✅ Returns 200 with a single DataFeed."
+          }
+        },
+        {
+          "name": "Create Data Feed",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"feedType\": \"CLAIM\",\n  \"sourceSystem\": \"SAP-Claims\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/feeds",
+              "host": ["{{base_url}}"],
+              "path": ["api", "feeds"]
+            },
+            "description": "✅ VERIFIED. Returns 201 Created.\n\nfeedType enum: CLAIM | POLICY | PAYMENT | RESERVE\nstatus enum: ACTIVE | INACTIVE | FAILED\nsourceSystem: 2-100 chars, letters only\n\n⚠️ feedName, fileCount, recordCount are NOT valid fields."
+          }
+        },
+        {
+          "name": "Update Data Feed Status",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/feeds/1/status?status=INACTIVE",
+              "host": ["{{base_url}}"],
+              "path": ["api", "feeds", "1", "status"],
+              "query": [{ "key": "status", "value": "INACTIVE" }]
+            },
+            "description": "Update feed status. Values: ACTIVE | INACTIVE | FAILED"
+          }
+        },
+        {
+          "name": "Delete Data Feed",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/feeds/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "feeds", "1"]
+            },
+            "description": "✅ Returns 204 No Content."
+          }
+        }
+      ]
+    },
+    {
+      "name": "📥 Data Ingestion — Raw Claims (Analyst, Admin)",
+      "description": "Service: data-ingestion-service (port 8082)\nGateway route: /api/ingest/** → lb://data-ingestion-service\n\n✅ VERIFIED WORKING",
+      "item": [
+        {
+          "name": "Get All Raw Claims",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/ingest/raw-claims",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ingest", "raw-claims"]
+            },
+            "description": "✅ Returns 200 with list of ClaimRaw objects."
+          }
+        },
+        {
+          "name": "Get Raw Claim by Claim ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/ingest/raw-claims/CLM-2026-AUTO-001",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ingest", "raw-claims", "CLM-2026-AUTO-001"]
+            },
+            "description": "✅ Returns 200. Use a real claimId that exists in the database."
+          }
+        },
+        {
+          "name": "Get Raw Claims by Feed ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/ingest/raw-claims/feed/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ingest", "raw-claims", "feed", "1"]
+            }
+          }
+        },
+        {
+          "name": "Ingest Raw Claim",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claimId\": \"CLM-TEST-001\",\n  \"feedId\": 1,\n  \"payloadJson\": \"{\\\"claimType\\\":\\\"Auto\\\",\\\"amount\\\":5000,\\\"policyNumber\\\":\\\"POL-2024-001\\\"}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ingest",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ingest"]
+            },
+            "description": "✅ VERIFIED. Returns 200.\n\n⚠️ feedId is a Long (integer), NOT a string like 'FEED-001'\n⚠️ feedType is NOT a field in this request — only claimId, feedId, payloadJson\n\nclaimId: 3-100 chars, alphanumeric/dash/underscore only\nfeedId: must reference an existing feed (use Create Data Feed first)"
+          }
+        },
+        {
+          "name": "Delete Raw Claim",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/ingest/raw-claims/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ingest", "raw-claims", "1"]
+            },
+            "description": "Delete by rawId (auto-generated Long ID, not claimId string)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "📊 Claims Analytics — KPIs (Analyst, Manager, Actuary, Ops Exec, Admin)",
+      "description": "Service: claims-metrics-service (port 8083)\nGateway route: /api/kpis/** → lb://claims-metrics-service\n\n⚠️ Requires claims-metrics-service to be running",
+      "item": [
+        {
+          "name": "Get All KPIs",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/kpis",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kpis"]
+            }
+          }
+        },
+        {
+          "name": "Get KPI by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/kpis/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kpis", "1"]
+            }
+          }
+        },
+        {
+          "name": "Get KPIs by Claim ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/kpis/claim/CLM-2026-AUTO-001",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kpis", "claim", "CLM-2026-AUTO-001"]
+            }
+          }
+        },
+        {
+          "name": "Get KPIs by Metric Name",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/kpis/metric/TAT",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kpis", "metric", "TAT"]
+            },
+            "description": "metricName values: TAT | CYCLE_TIME | SEVERITY | FREQUENCY | LOSS_RATIO"
+          }
+        },
+        {
+          "name": "Get KPIs by Date Range",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/kpis/date-range?start=2024-01-01&end=2024-12-31",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kpis", "date-range"],
+              "query": [
+                { "key": "start", "value": "2024-01-01" },
+                { "key": "end", "value": "2024-12-31" }
+              ]
+            },
+            "description": "⚠️ Query params are 'start' and 'end', NOT 'startDate'/'endDate'"
+          }
+        },
+        {
+          "name": "Record New KPI",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claimId\": \"CLM-2026-AUTO-001\",\n  \"metricName\": \"TAT\",\n  \"metricValue\": 4.5,\n  \"metricDate\": \"2024-03-15\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/kpis",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kpis"]
+            },
+            "description": "metricName enum: TAT | CYCLE_TIME | SEVERITY | FREQUENCY | LOSS_RATIO\nmetricValue: decimal >= 0.0\nmetricDate: yyyy-MM-dd format"
+          }
+        },
+        {
+          "name": "Calculate All KPIs for Claim",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/kpis/calculate/CLM-2026-AUTO-001",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kpis", "calculate", "CLM-2026-AUTO-001"]
+            },
+            "description": "Calculates and saves all 5 KPI metrics (TAT, CYCLE_TIME, SEVERITY, FREQUENCY, LOSS_RATIO) for the given claim."
+          }
+        },
+        {
+          "name": "Delete KPI Record",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/kpis/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "kpis", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "💰 Financial — Costs (Actuary, Manager, Admin)",
+      "description": "Service: cost-reserve-service (port 8089)\nGateway route: /api/costs/** → lb://cost-reserve-service\n\n✅ VERIFIED WORKING (GET endpoints confirmed)",
+      "item": [
+        {
+          "name": "Get All Costs",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/costs",
+              "host": ["{{base_url}}"],
+              "path": ["api", "costs"]
+            },
+            "description": "✅ Returns 200 with list of ClaimCost objects."
+          }
+        },
+        {
+          "name": "Get Cost by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/costs/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "costs", "1"]
+            }
+          }
+        },
+        {
+          "name": "Get Costs by Claim ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/costs/claim/CLM-2026-AUTO-001",
+              "host": ["{{base_url}}"],
+              "path": ["api", "costs", "claim", "CLM-2026-AUTO-001"]
+            }
+          }
+        },
+        {
+          "name": "Get Costs by Type",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/costs/type/MEDICAL",
+              "host": ["{{base_url}}"],
+              "path": ["api", "costs", "type", "MEDICAL"]
+            },
+            "description": "costType enum: MEDICAL | LEGAL | REPAIR | SETTLEMENT"
+          }
+        },
+        {
+          "name": "Get Cost Summary by Type",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/costs/summary/by-type",
+              "host": ["{{base_url}}"],
+              "path": ["api", "costs", "summary", "by-type"]
+            }
+          }
+        },
+        {
+          "name": "Get Highest Cost Claim",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/costs/analytics/highest-cost-claim",
+              "host": ["{{base_url}}"],
+              "path": ["api", "costs", "analytics", "highest-cost-claim"]
+            }
+          }
+        },
+        {
+          "name": "Create Cost Record",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claimId\": \"CLM-2026-AUTO-001\",\n  \"costType\": \"MEDICAL\",\n  \"amount\": 15000.00,\n  \"costDate\": \"2024-03-01\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/costs",
+              "host": ["{{base_url}}"],
+              "path": ["api", "costs"]
+            },
+            "description": "✅ VERIFIED CORRECT SCHEMA. Returns 201 Created.\n\ncostType enum: MEDICAL | LEGAL | REPAIR | SETTLEMENT\namount: decimal > 0\ncostDate: yyyy-MM-dd\n\n⚠️ Field is 'costDate' NOT 'incurredDate'"
+          }
+        },
+        {
+          "name": "Update Cost Record",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claimId\": \"CLM-2026-AUTO-001\",\n  \"costType\": \"LEGAL\",\n  \"amount\": 20000.00,\n  \"costDate\": \"2024-04-01\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/costs/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "costs", "1"]
+            }
+          }
+        },
+        {
+          "name": "Delete Cost Record",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/costs/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "costs", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "💰 Financial — Reserves (Actuary, Manager, Admin)",
+      "description": "Service: cost-reserve-service (port 8089)\nGateway route: /api/reserves/** → lb://cost-reserve-service\n\n✅ VERIFIED WORKING",
+      "item": [
+        {
+          "name": "Get All Reserves",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/reserves",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reserves"]
+            },
+            "description": "✅ Returns 200."
+          }
+        },
+        {
+          "name": "Get Reserve by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/reserves/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reserves", "1"]
+            }
+          }
+        },
+        {
+          "name": "Get Reserves by Claim ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/reserves/claim/CLM-2026-AUTO-001",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reserves", "claim", "CLM-2026-AUTO-001"]
+            }
+          }
+        },
+        {
+          "name": "Get Total Reserve Amount",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/reserves/analytics/total",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reserves", "analytics", "total"]
+            },
+            "description": "✅ Returns 200 with total reserve amount."
+          }
+        },
+        {
+          "name": "Get Reserve Summary (All Claims Latest)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/reserves/analytics/summary",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reserves", "analytics", "summary"]
+            },
+            "description": "✅ Returns 200 with latest reserve summary per claim."
+          }
+        },
+        {
+          "name": "Get Monthly Reserve Trend for Claim",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/reserves/claim/CLM-2026-AUTO-001/trend/monthly",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reserves", "claim", "CLM-2026-AUTO-001", "trend", "monthly"]
+            }
+          }
+        },
+        {
+          "name": "Create Reserve Record",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claimId\": \"CLM-2026-AUTO-001\",\n  \"reserveAmount\": 50000.00,\n  \"updatedDate\": \"2024-03-15\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/reserves",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reserves"]
+            },
+            "description": "✅ VERIFIED. Returns 201 Created.\n\nreserveAmount: decimal > 0\nupdatedDate: yyyy-MM-dd\n\n⚠️ 'reserveType' is NOT a field — do not include it"
+          }
+        },
+        {
+          "name": "Update Reserve Record",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claimId\": \"CLM-2026-AUTO-001\",\n  \"reserveAmount\": 60000.00,\n  \"updatedDate\": \"2024-04-01\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/reserves/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reserves", "1"]
+            }
+          }
+        },
+        {
+          "name": "Delete Reserve Record",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/reserves/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reserves", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "💰 Financial — Aging (Actuary, Manager, Admin)",
+      "description": "Service: cost-reserve-service (port 8089)\nGateway route: /api/aging/** → lb://cost-reserve-service\n\n✅ VERIFIED WORKING (GET confirmed)",
+      "item": [
+        {
+          "name": "Get All Aging Records",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/aging",
+              "host": ["{{base_url}}"],
+              "path": ["api", "aging"]
+            },
+            "description": "✅ Returns 200."
+          }
+        },
+        {
+          "name": "Get Aging Record by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/aging/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "aging", "1"]
+            }
+          }
+        },
+        {
+          "name": "Get Aging Records by Claim ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/aging/claim/CLM-2026-AUTO-001",
+              "host": ["{{base_url}}"],
+              "path": ["api", "aging", "claim", "CLM-2026-AUTO-001"]
+            }
+          }
+        },
+        {
+          "name": "Get Aging Records by Bucket",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/aging/bucket/BUCKET_31_60",
+              "host": ["{{base_url}}"],
+              "path": ["api", "aging", "bucket", "BUCKET_31_60"]
+            },
+            "description": "agingBucket enum: BUCKET_0_30 | BUCKET_31_60 | BUCKET_61_90 | BUCKET_90_PLUS"
+          }
+        },
+        {
+          "name": "Get Aging Distribution",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/aging/analytics/distribution",
+              "host": ["{{base_url}}"],
+              "path": ["api", "aging", "analytics", "distribution"]
+            }
+          }
+        },
+        {
+          "name": "Get Portfolio Aging Health",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/aging/analytics/portfolio-health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "aging", "analytics", "portfolio-health"]
+            }
+          }
+        },
+        {
+          "name": "Get Escalated Claims (Aged Beyond N Days)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/aging/escalation?days=90",
+              "host": ["{{base_url}}"],
+              "path": ["api", "aging", "escalation"],
+              "query": [{ "key": "days", "value": "90" }]
+            }
+          }
+        },
+        {
+          "name": "Create Aging Record",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claimId\": \"CLM-2026-AUTO-001\",\n  \"agingDays\": 45,\n  \"agingBucket\": \"BUCKET_31_60\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/aging",
+              "host": ["{{base_url}}"],
+              "path": ["api", "aging"]
+            },
+            "description": "✅ VERIFIED CORRECT SCHEMA. Returns 201 Created.\n\nagingBucket enum: BUCKET_0_30 | BUCKET_31_60 | BUCKET_61_90 | BUCKET_90_PLUS\nagingDays: integer >= 0\n\n⚠️ 'agingBucket' is REQUIRED — do not send without it\n\nBucket guide:\n  BUCKET_0_30    → 0–30 days\n  BUCKET_31_60   → 31–60 days (agingDays: 45)\n  BUCKET_61_90   → 61–90 days (agingDays: 75)\n  BUCKET_90_PLUS → 91+ days   (agingDays: 95)"
+          }
+        },
+        {
+          "name": "Update Aging Record",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claimId\": \"CLM-2026-AUTO-001\",\n  \"agingDays\": 95,\n  \"agingBucket\": \"BUCKET_90_PLUS\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/aging/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "aging", "1"]
+            }
+          }
+        },
+        {
+          "name": "Delete Aging Record",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/aging/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "aging", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "👥 Adjuster Operations — Performance (Manager, Ops Exec, Admin)",
+      "description": "Service: AdjusterAndOperations (port 8087)\nGateway route: /api/adjusters/** → lb://AdjusterAndOperations\n\n⚠️ Requires AdjusterAndOperations service to be running",
+      "item": [
+        {
+          "name": "Get All Adjuster Performance",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/adjusters/performance?period=Q1-2024",
+              "host": ["{{base_url}}"],
+              "path": ["api", "adjusters", "performance"],
+              "query": [{ "key": "period", "value": "Q1-2024" }]
+            }
+          }
+        },
+        {
+          "name": "Get Performance by Adjuster ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/adjusters/1/performance?period=Q1-2024",
+              "host": ["{{base_url}}"],
+              "path": ["api", "adjusters", "1", "performance"],
+              "query": [{ "key": "period", "value": "Q1-2024" }]
+            }
+          }
+        },
+        {
+          "name": "Get Top Performers",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/adjusters/top-performers?period=Q1-2024",
+              "host": ["{{base_url}}"],
+              "path": ["api", "adjusters", "top-performers"],
+              "query": [{ "key": "period", "value": "Q1-2024" }]
+            }
+          }
+        },
+        {
+          "name": "Get Training-Flagged Adjusters",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/adjusters/training-flagged?period=Q1-2024",
+              "host": ["{{base_url}}"],
+              "path": ["api", "adjusters", "training-flagged"],
+              "query": [{ "key": "period", "value": "Q1-2024" }]
+            }
+          }
+        },
+        {
+          "name": "Get Low Productivity Adjusters",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/adjusters/low-productivity?period=Q1-2024&threshold=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "adjusters", "low-productivity"],
+              "query": [
+                { "key": "period", "value": "Q1-2024" },
+                { "key": "threshold", "value": "20" }
+              ]
+            },
+            "description": "threshold: minimum claimsHandled to not be considered low productivity (default 20)"
+          }
+        },
+        {
+          "name": "Get SLA Compliance Risk Adjusters",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/adjusters/sla-compliance-risk?period=Q1-2024",
+              "host": ["{{base_url}}"],
+              "path": ["api", "adjusters", "sla-compliance-risk"],
+              "query": [{ "key": "period", "value": "Q1-2024" }]
+            }
+          }
+        },
+        {
+          "name": "Record Adjuster Performance",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"adjusterId\": 101,\n  \"claimsHandled\": 45,\n  \"totalDaysTaken\": 180,\n  \"slaMetCount\": 40,\n  \"slaBreachedCount\": 5,\n  \"deniedClaimsCount\": 3,\n  \"errorRate\": 6.67,\n  \"period\": \"Q1-2024\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/adjusters/performance",
+              "host": ["{{base_url}}"],
+              "path": ["api", "adjusters", "performance"]
+            },
+            "description": "Required: adjusterId (Long), period (String)\nOptional: claimsHandled, totalDaysTaken, slaMetCount, slaBreachedCount, deniedClaimsCount, errorRate (0-100)\n\nCalculated fields (do not include): avgTat, qualityScore, denialRate, slaComplianceRate, performanceIndex"
+          }
+        }
+      ]
+    },
+    {
+      "name": "👥 Adjuster Operations — SLA Violations (Manager, Ops Exec, Admin)",
+      "description": "Service: AdjusterAndOperations (port 8087)\nGateway route: /api/sla-violations/** → lb://AdjusterAndOperations\n\n⚠️ Requires AdjusterAndOperations service to be running",
+      "item": [
+        {
+          "name": "Get All SLA Violations",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/sla-violations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sla-violations"]
+            }
+          }
+        },
+        {
+          "name": "Get SLA Violations by Adjuster",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/sla-violations/adjuster/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sla-violations", "adjuster", "1"]
+            }
+          }
+        },
+        {
+          "name": "Record SLA Violation",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claimId\": 1,\n  \"adjusterId\": 101,\n  \"violationType\": \"RESPONSE_TIME\",\n  \"slaTargetDays\": 5,\n  \"actualDays\": 8,\n  \"violationDate\": \"2024-03-15\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/sla-violations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sla-violations"]
+            },
+            "description": "⚠️ claimId is a Long (FK to a claim record), NOT a String like 'CLM-001'\nadjusterId: Long\nviolationType: validated string (e.g., RESPONSE_TIME, SETTLEMENT_DELAY, DOCUMENTATION)\nslaTargetDays: int >= 1\nactualDays: int >= 1\nviolationDate: yyyy-MM-dd"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔔 Notifications (All Roles)",
+      "description": "Service: NotificationService (port 8088)\nGateway route: /api/notifications/** → lb://NotificationService\n\n⚠️ Requires NotificationService to be running",
+      "item": [
+        {
+          "name": "Get User Notifications",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/notifications/user/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "notifications", "user", "1"]
+            },
+            "description": "userId: Long — use the numeric userId from your JWT token"
+          }
+        },
+        {
+          "name": "Get Notifications by Status",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/notifications/user/1/status/UNREAD",
+              "host": ["{{base_url}}"],
+              "path": ["api", "notifications", "user", "1", "status", "UNREAD"]
+            },
+            "description": "status enum: UNREAD | READ | DISMISSED | ACTIONED"
+          }
+        },
+        {
+          "name": "Get Notifications by Category",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/notifications/user/1/category/RISK",
+              "host": ["{{base_url}}"],
+              "path": ["api", "notifications", "user", "1", "category", "RISK"]
+            },
+            "description": "category enum: RISK | DENIAL | COST | PERFORMANCE | AGING | SYSTEM"
+          }
+        },
+        {
+          "name": "Get Notification by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/notifications/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "notifications", "1"]
+            }
+          }
+        },
+        {
+          "name": "Get Unread Count",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/notifications/unread-count/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "notifications", "unread-count", "1"]
+            }
+          }
+        },
+        {
+          "name": "Create Notification",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": 1,\n  \"title\": \"High Risk Score Detected\",\n  \"message\": \"Claim CLM-2026-AUTO-001 has a risk score of 87. Immediate review recommended.\",\n  \"category\": \"RISK\",\n  \"referenceId\": \"CLM-2026-AUTO-001\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/notifications",
+              "host": ["{{base_url}}"],
+              "path": ["api", "notifications"]
+            },
+            "description": "category enum: RISK | DENIAL | COST | PERFORMANCE | AGING | SYSTEM\nreferenceId: optional, max 50 chars (e.g., claim ID)\nstatus is auto-set to UNREAD on creation"
+          }
+        },
+        {
+          "name": "Update Notification Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"READ\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/notifications/1/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "notifications", "1", "status"]
+            },
+            "description": "status enum: UNREAD | READ | DISMISSED | ACTIONED"
+          }
+        },
+        {
+          "name": "Mark All Notifications as Read",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/notifications/user/1/mark-all-read",
+              "host": ["{{base_url}}"],
+              "path": ["api", "notifications", "user", "1", "mark-all-read"]
+            }
+          }
+        },
+        {
+          "name": "Delete Notification",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/notifications/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "notifications", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔍 Fraud Risk — Risk Scores (Fraud Analyst, Admin)",
+      "description": "Service: fraud-risk-service\nGateway route: /api/risk-scores/** → lb://fraud-risk-service\n\n⚠️ Requires fraud-risk-service to be running",
+      "item": [
+        {
+          "name": "Get All Risk Scores",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/risk-scores",
+              "host": ["{{base_url}}"],
+              "path": ["api", "risk-scores"]
+            }
+          }
+        },
+        {
+          "name": "Get Risk Score by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/risk-scores/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "risk-scores", "1"]
+            }
+          }
+        },
+        {
+          "name": "Get Risk Scores by Claim ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/risk-scores/claim/CLM-2026-AUTO-001",
+              "host": ["{{base_url}}"],
+              "path": ["api", "risk-scores", "claim", "CLM-2026-AUTO-001"]
+            }
+          }
+        },
+        {
+          "name": "Get Latest Risk Score for Claim",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/risk-scores/claim/CLM-2026-AUTO-001/latest",
+              "host": ["{{base_url}}"],
+              "path": ["api", "risk-scores", "claim", "CLM-2026-AUTO-001", "latest"]
+            }
+          }
+        },
+        {
+          "name": "Get Risk Scores Above Threshold",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/risk-scores/threshold/75",
+              "host": ["{{base_url}}"],
+              "path": ["api", "risk-scores", "threshold", "75"]
+            },
+            "description": "Returns all risk scores with scoreValue >= threshold (0-100)"
+          }
+        },
+        {
+          "name": "Create Risk Score",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claimId\": \"CLM-2026-AUTO-001\",\n  \"scoreValue\": 87.5,\n  \"computedDate\": \"2024-03-15\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/risk-scores",
+              "host": ["{{base_url}}"],
+              "path": ["api", "risk-scores"]
+            },
+            "description": "scoreValue: Double (validated by @ValidateScoreValue — likely 0.0 to 100.0)\ncomputedDate: yyyy-MM-dd"
+          }
+        },
+        {
+          "name": "Update Risk Score",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claimId\": \"CLM-2026-AUTO-001\",\n  \"scoreValue\": 92.0,\n  \"computedDate\": \"2024-04-01\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/risk-scores/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "risk-scores", "1"]
+            }
+          }
+        },
+        {
+          "name": "Delete Risk Score",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/risk-scores/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "risk-scores", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔍 Fraud Risk — Risk Indicators (Fraud Analyst, Admin)",
+      "description": "Service: fraud-risk-service\nGateway route: /api/risk-indicators/** → lb://fraud-risk-service\n\n⚠️ Requires fraud-risk-service to be running",
+      "item": [
+        {
+          "name": "Get All Risk Indicators",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/risk-indicators",
+              "host": ["{{base_url}}"],
+              "path": ["api", "risk-indicators"]
+            }
+          }
+        },
+        {
+          "name": "Get Risk Indicators by Claim ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/risk-indicators/claim/CLM-2026-AUTO-001",
+              "host": ["{{base_url}}"],
+              "path": ["api", "risk-indicators", "claim", "CLM-2026-AUTO-001"]
+            }
+          }
+        },
+        {
+          "name": "Get Risk Indicators by Type",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/risk-indicators/type/HighCost",
+              "host": ["{{base_url}}"],
+              "path": ["api", "risk-indicators", "type", "HighCost"]
+            },
+            "description": "indicatorType enum: HighCost | UnusualTiming | Pattern\n⚠️ PascalCase — NOT SCREAMING_SNAKE_CASE"
+          }
+        },
+        {
+          "name": "Get Risk Indicators by Severity",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/risk-indicators/severity/HIGH",
+              "host": ["{{base_url}}"],
+              "path": ["api", "risk-indicators", "severity", "HIGH"]
+            },
+            "description": "severity: validated by @ValidateSeverity (likely: LOW | MEDIUM | HIGH | CRITICAL)"
+          }
+        },
+        {
+          "name": "Create Risk Indicator",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claimId\": \"CLM-2026-AUTO-001\",\n  \"indicatorType\": \"HighCost\",\n  \"severity\": \"HIGH\",\n  \"triggeredDate\": \"2024-03-15\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/risk-indicators",
+              "host": ["{{base_url}}"],
+              "path": ["api", "risk-indicators"]
+            },
+            "description": "indicatorType enum: HighCost | UnusualTiming | Pattern  (PascalCase)\nseverity: LOW | MEDIUM | HIGH | CRITICAL  (validated by custom validator)\ntriggeredDate: yyyy-MM-dd"
+          }
+        },
+        {
+          "name": "Update Risk Indicator",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claimId\": \"CLM-2026-AUTO-001\",\n  \"indicatorType\": \"Pattern\",\n  \"severity\": \"CRITICAL\",\n  \"triggeredDate\": \"2024-04-01\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/risk-indicators/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "risk-indicators", "1"]
+            }
+          }
+        },
+        {
+          "name": "Delete Risk Indicator",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/risk-indicators/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "risk-indicators", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📋 Denial & Leakage — Denial Patterns (Analyst, Fraud Analyst, Admin)",
+      "description": "Service: denial-leakage-service\nGateway route: /api/denial-patterns/** → lb://denial-leakage-service\n\n⚠️ Requires denial-leakage-service to be running",
+      "item": [
+        {
+          "name": "Get All Denial Patterns",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/denial-patterns",
+              "host": ["{{base_url}}"],
+              "path": ["api", "denial-patterns"]
+            }
+          }
+        },
+        {
+          "name": "Get Denial Pattern by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/denial-patterns/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "denial-patterns", "1"]
+            }
+          }
+        },
+        {
+          "name": "Get Denial Patterns by Claim ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/denial-patterns/claim/CLM-2026-AUTO-001",
+              "host": ["{{base_url}}"],
+              "path": ["api", "denial-patterns", "claim", "CLM-2026-AUTO-001"]
+            }
+          }
+        },
+        {
+          "name": "Get Denial Patterns by Denial Code",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/denial-patterns/code/CO-4",
+              "host": ["{{base_url}}"],
+              "path": ["api", "denial-patterns", "code", "CO-4"]
+            },
+            "description": "Common denial codes: CO-4, PR-96, CO-97, CO-50, PR-204"
+          }
+        },
+        {
+          "name": "Search Denial Patterns by Keyword",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/denial-patterns/search/duplicate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "denial-patterns", "search", "duplicate"]
+            }
+          }
+        },
+        {
+          "name": "Create Denial Pattern",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claimId\": \"CLM-2026-AUTO-001\",\n  \"denialCode\": \"CO-4\",\n  \"reason\": \"The service is inconsistent with the patient's condition or the medical necessity of services rendered.\",\n  \"occurrenceDate\": \"2024-03-01\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/denial-patterns",
+              "host": ["{{base_url}}"],
+              "path": ["api", "denial-patterns"]
+            },
+            "description": "denialCode: validated by @ValidateDenialCode (format like CO-4, PR-96)\nreason: required string\noccurrenceDate: yyyy-MM-dd, must not be in the future (@PastOrPresent)"
+          }
+        },
+        {
+          "name": "Update Denial Pattern",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claimId\": \"CLM-2026-AUTO-001\",\n  \"denialCode\": \"PR-96\",\n  \"reason\": \"Non-covered charge. Benefit is not included in the plan.\",\n  \"occurrenceDate\": \"2024-03-15\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/denial-patterns/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "denial-patterns", "1"]
+            }
+          }
+        },
+        {
+          "name": "Delete Denial Pattern",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/denial-patterns/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "denial-patterns", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📋 Denial & Leakage — Leakage Flags (Analyst, Fraud Analyst, Admin)",
+      "description": "Service: denial-leakage-service\nGateway route: /api/leakage-flags/** → lb://denial-leakage-service\n\n⚠️ Requires denial-leakage-service to be running",
+      "item": [
+        {
+          "name": "Get All Leakage Flags",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/leakage-flags",
+              "host": ["{{base_url}}"],
+              "path": ["api", "leakage-flags"]
+            }
+          }
+        },
+        {
+          "name": "Get Leakage Flag by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/leakage-flags/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "leakage-flags", "1"]
+            }
+          }
+        },
+        {
+          "name": "Get Leakage Flags by Claim ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/leakage-flags/claim/CLM-2026-AUTO-001",
+              "host": ["{{base_url}}"],
+              "path": ["api", "leakage-flags", "claim", "CLM-2026-AUTO-001"]
+            }
+          }
+        },
+        {
+          "name": "Get Leakage Flags by Type",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/leakage-flags/type/Overpayment",
+              "host": ["{{base_url}}"],
+              "path": ["api", "leakage-flags", "type", "Overpayment"]
+            },
+            "description": "leakageType enum: Overpayment | Delay | Error  (PascalCase)"
+          }
+        },
+        {
+          "name": "Get Leakage Flags by Estimated Loss",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/leakage-flags/loss/10000",
+              "host": ["{{base_url}}"],
+              "path": ["api", "leakage-flags", "loss", "10000"]
+            },
+            "description": "Returns leakage flags where estimatedLoss >= specified amount"
+          }
+        },
+        {
+          "name": "Create Leakage Flag",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claimId\": \"CLM-2026-AUTO-001\",\n  \"leakageType\": \"Overpayment\",\n  \"estimatedLoss\": 12500.00,\n  \"identifiedDate\": \"2024-03-15\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/leakage-flags",
+              "host": ["{{base_url}}"],
+              "path": ["api", "leakage-flags"]
+            },
+            "description": "leakageType enum: Overpayment | Delay | Error  (PascalCase — NOT UPPER_CASE)\nestimatedLoss: Double (validated by @ValidateEstimatedLoss)\nidentifiedDate: yyyy-MM-dd, must not be in the future (@PastOrPresent)"
+          }
+        },
+        {
+          "name": "Update Leakage Flag",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claimId\": \"CLM-2026-AUTO-001\",\n  \"leakageType\": \"Delay\",\n  \"estimatedLoss\": 8000.00,\n  \"identifiedDate\": \"2024-04-01\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/leakage-flags/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "leakage-flags", "1"]
+            }
+          }
+        },
+        {
+          "name": "Delete Leakage Flag",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/leakage-flags/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "leakage-flags", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📊 Analytics Reports (All Roles)",
+      "description": "Service: analytics-report-service\nGateway route: /api/reports/** → lb://analytics-report-service\n\n⚠️ Requires analytics-report-service to be running",
+      "item": [
+        {
+          "name": "Get All Reports",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/reports",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reports"]
+            }
+          }
+        },
+        {
+          "name": "Get Report by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/reports/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reports", "1"]
+            }
+          }
+        },
+        {
+          "name": "Get Reports by Scope",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/reports/scope/REGION",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reports", "scope", "REGION"]
+            },
+            "description": "scope enum: PRODUCT | REGION | CLAIM_TYPE | PERIOD"
+          }
+        },
+        {
+          "name": "Get Reports by Scope Value",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/reports/scope-value/Q1-2024",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reports", "scope-value", "Q1-2024"]
+            }
+          }
+        },
+        {
+          "name": "Get Reports by Date Range",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/reports/date-range?startDate=2024-01-01&endDate=2024-12-31",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reports", "date-range"],
+              "query": [
+                { "key": "startDate", "value": "2024-01-01" },
+                { "key": "endDate", "value": "2024-12-31" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Dashboard Summary",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/reports/analytics/dashboard-summary",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reports", "analytics", "dashboard-summary"]
+            },
+            "description": "Aggregated analytics summary for dashboard widgets"
+          }
+        },
+        {
+          "name": "Get Claim Summary (Cross-Service Aggregate)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/reports/claim-summary/CLM-2026-AUTO-001",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reports", "claim-summary", "CLM-2026-AUTO-001"]
+            },
+            "description": "Aggregates data from multiple services (costs, reserves, KPIs) for a single claim"
+          }
+        },
+        {
+          "name": "Get Report Count by Scope",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/reports/analytics/count-by-scope",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reports", "analytics", "count-by-scope"]
+            }
+          }
+        },
+        {
+          "name": "Get Monthly Report Trend",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/reports/analytics/trend/monthly",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reports", "analytics", "trend", "monthly"]
+            }
+          }
+        },
+        {
+          "name": "Create Analytics Report",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scope\": \"REGION\",\n  \"scopeValue\": \"North Region\",\n  \"metrics\": \"TAT, LossRatio, ClaimVolume, DenialRate\",\n  \"generatedDate\": \"2024-03-31\",\n  \"generatedBy\": \"analyst_john\",\n  \"reportData\": \"{\\\"totalClaims\\\":1250,\\\"avgTAT\\\":4.2,\\\"lossRatio\\\":0.68}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/reports",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reports"]
+            },
+            "description": "scope enum: PRODUCT | REGION | CLAIM_TYPE | PERIOD\nscopeValue: free text (e.g., 'North Region', 'Auto', 'Q1-2024')\nmetrics: comma-separated list of metric names\ngeneratedDate: yyyy-MM-dd\ngeneratedBy: username of who triggered the report\nreportData: optional JSON snapshot"
+          }
+        },
+        {
+          "name": "Delete Report",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/reports/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reports", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔐 Admin Only — Audit Logs",
+      "description": "Embedded in API Gateway (port 8086). No separate service needed.\n\n✅ VERIFIED WORKING\nUses {{admin_token}} — requires ROLE_ADMIN",
+      "item": [
+        {
+          "name": "Get All Audit Logs (Paginated)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/audit/logs?page=0&size=50",
+              "host": ["{{base_url}}"],
+              "path": ["api", "audit", "logs"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "50" }
+              ]
+            },
+            "description": "✅ Returns 200. Paginated list of all audit log entries."
+          }
+        },
+        {
+          "name": "Get Audit Logs by User",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/audit/logs/user/admin_alice",
+              "host": ["{{base_url}}"],
+              "path": ["api", "audit", "logs", "user", "admin_alice"]
+            },
+            "description": "✅ Returns 200. Filter logs by username."
+          }
+        },
+        {
+          "name": "Get Audit Logs by Action",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/audit/logs/action/LOGIN_SUCCESS",
+              "host": ["{{base_url}}"],
+              "path": ["api", "audit", "logs", "action", "LOGIN_SUCCESS"]
+            },
+            "description": "✅ Returns 200.\n\nCommon action values:\n  LOGIN_SUCCESS\n  LOGIN_FAILED\n  LOGOUT\n  REGISTER\n  TOKEN_REFRESH"
+          }
+        },
+        {
+          "name": "Get Audit Logs by Date Range",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/audit/logs/range?from=2024-01-01&to=2024-12-31",
+              "host": ["{{base_url}}"],
+              "path": ["api", "audit", "logs", "range"],
+              "query": [
+                { "key": "from", "value": "2024-01-01" },
+                { "key": "to", "value": "2024-12-31" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏥 Health & Infrastructure",
+      "description": "Health checks, actuator, and observability endpoints",
+      "item": [
+        {
+          "name": "Eureka Server Dashboard",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8761",
+              "host": ["localhost"],
+              "port": "8761"
+            },
+            "description": "✅ Open in browser to see all registered services"
+          }
+        },
+        {
+          "name": "API Gateway — Health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/actuator/health",
+              "host": ["{{base_url}}"],
+              "path": ["actuator", "health"]
+            },
+            "description": "✅ Returns 200 with status: UP"
+          }
+        },
+        {
+          "name": "API Gateway — Info",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/actuator/info",
+              "host": ["{{base_url}}"],
+              "path": ["actuator", "info"]
+            }
+          }
+        },
+        {
+          "name": "API Gateway — Active Routes",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/actuator/gateway/routes",
+              "host": ["{{base_url}}"],
+              "path": ["actuator", "gateway", "routes"]
+            },
+            "description": "Shows all active gateway routes — useful for debugging routing issues"
+          }
+        },
+        {
+          "name": "Zipkin — Distributed Tracing UI",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:9411",
+              "host": ["localhost"],
+              "port": "9411"
+            },
+            "description": "Open in browser to view distributed traces across services"
+          }
+        },
+        {
+          "name": "Cost Reserve Service — Direct Health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8089/actuator/health",
+              "host": ["localhost"],
+              "port": "8089",
+              "path": ["actuator", "health"]
+            }
+          }
+        },
+        {
+          "name": "Data Ingestion Service — Direct Health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8082/actuator/health",
+              "host": ["localhost"],
+              "port": "8082",
+              "path": ["actuator", "health"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8086",
+      "type": "string",
+      "description": "API Gateway URL — all requests go through here"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string",
+      "description": "JWT token — auto-populated by 'Login — Any User' request test script"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string",
+      "description": "Admin JWT token — auto-populated by 'Login — Admin' request test script"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="ClaimInsight360 - Start All Services" type="CompoundRunConfigurationType">
+    <toRun name="1 - Eureka Server" type="SpringBootApplicationConfigurationType" />
+    <toRun name="2 - API Gateway" type="SpringBootApplicationConfigurationType" />
+    <toRun name="3 - Data Ingestion Service" type="SpringBootApplicationConfigurationType" />
+    <toRun name="4 - Claims Metrics Service" type="SpringBootApplicationConfigurationType" />
+    <toRun name="5 - Fraud Risk Service" type="SpringBootApplicationConfigurationType" />
+    <toRun name="6 - Denial Leakage Service" type="SpringBootApplicationConfigurationType" />
+    <toRun name="7 - Adjuster and Operations" type="SpringBootApplicationConfigurationType" />
+    <toRun name="8 - Cost Reserve Service" type="SpringBootApplicationConfigurationType" />
+    <toRun name="9 - Notification Service" type="SpringBootApplicationConfigurationType" />
+    <toRun name="10 - Analytics Report Service" type="SpringBootApplicationConfigurationType" />
+    <method v="2" />
+  </configuration>
+</component>
