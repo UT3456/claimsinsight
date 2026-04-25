@@ -6,6 +6,18 @@ import {
 import { PlusOutlined, ReloadOutlined, DeleteOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { agingApi, AgingRecord, CreateAgingRequest, AGING_BUCKETS, AGING_BUCKET_LABELS } from '../../api/financialApi';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend, CartesianGrid, LabelList,
+} from 'recharts';
+import ChartCard, { CHART_COLORS } from '../../components/charts/ChartCard';
+
+const BUCKET_CHART_COLORS: Record<string, string> = {
+  'BUCKET_0_30':   CHART_COLORS.success,
+  'BUCKET_31_60':  CHART_COLORS.warn,
+  'BUCKET_61_90':  CHART_COLORS.accent2,
+  'BUCKET_90_PLUS':CHART_COLORS.danger,
+};
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -162,6 +174,60 @@ export default function AgingPage() {
           </Col>
         ))}
       </Row>
+
+      {(() => {
+        const bucketData = AGING_BUCKETS.map(b => ({
+          name:  AGING_BUCKET_LABELS[b] ?? b,
+          count: bucketCounts[b] ?? 0,
+          color: BUCKET_CHART_COLORS[b] ?? CHART_COLORS.info,
+        }));
+        const hasData = bucketData.some(d => d.count > 0);
+        return (
+          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+            <Col xs={24} lg={14}>
+              <ChartCard
+                title="Aging Distribution"
+                subtitle="Number of claims in each aging bucket"
+                loading={state.loading}
+                isEmpty={!state.loading && !hasData}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={bucketData} margin={{ top: 20, right: 10, bottom: 0, left: -20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--ci-border)" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} />
+                    <RTooltip contentStyle={{ background: 'var(--ci-bg-surface)', border: '1px solid var(--ci-border)', borderRadius: 8 }} />
+                    <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                      <LabelList dataKey="count" position="top" style={{ fill: 'var(--ci-text-primary)', fontSize: 12 }} />
+                      {bucketData.map((b, i) => <Cell key={i} fill={b.color} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </Col>
+
+            <Col xs={24} lg={10}>
+              <ChartCard
+                title="Aging Share"
+                subtitle="Proportional view of bucket mix"
+                loading={state.loading}
+                isEmpty={!state.loading && !hasData}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={bucketData.filter(b => b.count > 0)} dataKey="count" nameKey="name"
+                      cx="50%" cy="50%" innerRadius={55} outerRadius={95} paddingAngle={2}>
+                      {bucketData.filter(b => b.count > 0).map((b, i) => <Cell key={i} fill={b.color} />)}
+                    </Pie>
+                    <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                    <RTooltip contentStyle={{ background: 'var(--ci-bg-surface)', border: '1px solid var(--ci-border)', borderRadius: 8 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </Col>
+          </Row>
+        );
+      })()}
 
       {state.error && <Alert type="error" message={state.error} style={{ marginBottom: 16 }} />}
 

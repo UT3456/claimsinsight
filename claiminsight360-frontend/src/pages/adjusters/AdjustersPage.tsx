@@ -6,6 +6,11 @@ import {
 import { PlusOutlined, ReloadOutlined, DeleteOutlined, TrophyOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { adjustersApi, AdjusterPerformance, CreateAdjusterRequest } from '../../api/adjustersApi';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer,
+  CartesianGrid, Legend, ComposedChart, Line,
+} from 'recharts';
+import ChartCard, { CHART_COLORS } from '../../components/charts/ChartCard';
 
 const { Title, Text } = Typography;
 
@@ -106,6 +111,17 @@ export default function AdjustersPage() {
     ? (state.items.reduce((s, i) => s + (i.avgTat ?? 0), 0) / state.items.length).toFixed(1)
     : '—';
 
+  // ── Chart data ────────────────────────────────────────────────────────────
+  const topAdjusters = [...state.items]
+    .sort((a, b) => b.claimsHandled - a.claimsHandled)
+    .slice(0, 10)
+    .map(i => ({
+      name: `#${i.adjusterId}`,
+      claims: i.claimsHandled,
+      avgTat: Number((i.avgTat ?? 0).toFixed(1)),
+      slaRate: Number((i.slaComplianceRate ?? 0).toFixed(1)),
+    }));
+
   const columns: ColumnsType<AdjusterPerformance> = [
     { title: 'Adjuster ID',  dataIndex: 'adjusterId',        key: 'adjusterId',       width: 110 },
     { title: 'Period',       dataIndex: 'period',            key: 'period',            render: v => <Tag color="purple">{v}</Tag> },
@@ -166,6 +182,52 @@ export default function AdjustersPage() {
       </Row>
 
       {state.error && <Alert type="error" message={state.error} style={{ marginBottom: 16 }} />}
+
+      {/* Charts */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col xs={24} lg={14}>
+          <ChartCard
+            title="Top 10 Adjusters — Claims vs. Avg TAT"
+            subtitle="Bars = claims handled, line = average turnaround (days)"
+            loading={state.loading}
+            isEmpty={!state.loading && topAdjusters.length === 0}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={topAdjusters} margin={{ top: 10, right: 20, bottom: 0, left: -10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--ci-border)" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} />
+                <YAxis yAxisId="left"  tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} />
+                <RTooltip contentStyle={{ background: 'var(--ci-bg-surface)', border: '1px solid var(--ci-border)', borderRadius: 8 }} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar  yAxisId="left"  dataKey="claims" fill={CHART_COLORS.primary} radius={[6, 6, 0, 0]} name="Claims Handled" />
+                <Line yAxisId="right" type="monotone" dataKey="avgTat" stroke={CHART_COLORS.danger}
+                  strokeWidth={2.5} dot={{ r: 4 }} name="Avg TAT (days)" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Col>
+
+        <Col xs={24} lg={10}>
+          <ChartCard
+            title="SLA Compliance per Adjuster"
+            subtitle="Top 10 adjusters by claim volume"
+            loading={state.loading}
+            isEmpty={!state.loading && topAdjusters.length === 0}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={topAdjusters} layout="vertical" margin={{ top: 10, right: 20, bottom: 0, left: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--ci-border)" />
+                <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} unit="%" />
+                <YAxis dataKey="name" type="category" width={50} tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} />
+                <RTooltip formatter={(v) => `${Number(v)}%`}
+                  contentStyle={{ background: 'var(--ci-bg-surface)', border: '1px solid var(--ci-border)', borderRadius: 8 }} />
+                <Bar dataKey="slaRate" fill={CHART_COLORS.success} radius={[0, 6, 6, 0]} name="SLA %" />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Col>
+      </Row>
 
       <Table
         rowKey="perfId"

@@ -10,6 +10,18 @@ import {
   UserOutlined, LockOutlined, MailOutlined,
   SafetyCertificateOutlined, IdcardOutlined,
 } from '@ant-design/icons';
+import {
+  FiBarChart2, FiFolder, FiTrendingUp,
+  FiSearch,
+} from 'react-icons/fi';
+import { TbAbacus } from 'react-icons/tb';
+
+const roleOption = (icon: React.ReactNode, text: string) => (
+  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+    <span style={{ color: '#2563eb', display: 'inline-flex', fontSize: 16 }}>{icon}</span>
+    {text}
+  </span>
+);
 import { authApi } from '../../api/authApi';
 
 const { Title, Text } = Typography;
@@ -67,33 +79,14 @@ export default function RegisterPage() {
   };
 
   return (
-    <div style={styles.page}>
-      <div style={styles.blobTop}    />
-      <div style={styles.blobBottom} />
-
-      <div style={styles.card}>
+    <div className="ci-auth-page">
+      <div className="ci-auth-card" style={{ maxWidth: 400 }}>
         {/* Header */}
-        <div style={styles.logoRow}>
-          <div style={styles.logoIcon}>
-            <SafetyCertificateOutlined style={{ fontSize: 28, color: '#fff' }} />
-          </div>
-          <div>
-            <Title level={4} style={{ margin: 0, color: '#0f172a', lineHeight: 1.2 }}>
-              ClaimInsight<span style={{ color: '#2563eb' }}>360</span>
-            </Title>
-            <Text style={{ fontSize: 11, color: '#64748b', letterSpacing: '0.05em' }}>
-              INSURANCE ANALYTICS PLATFORM
-            </Text>
-          </div>
-        </div>
-
-        <Divider style={{ margin: '20px 0' }} />
-
-        <Title level={3} style={{ margin: '0 0 4px', color: '#0f172a' }}>
+        <Title level={4} style={{ margin: '0 0 4px', color: '#222', textAlign: 'center' }}>
           Create account
         </Title>
-        <Text style={{ color: '#64748b', display: 'block', marginBottom: 24 }}>
-          Fill in the details below to get started
+        <Text style={{ color: '#888', display: 'block', marginBottom: 20, textAlign: 'center', fontSize: 12 }}>
+          Get started with ClaimInsight360
         </Text>
 
         {/* Feedback */}
@@ -163,22 +156,16 @@ export default function RegisterPage() {
                   {
                     label: 'Analytics & Operations',
                     options: [
-                      { value: 'ROLE_CLAIMS_ANALYST',  label: '📊 Claims Analyst — Trends, denials, cost drivers' },
-                      { value: 'ROLE_CLAIMS_MANAGER',  label: '🗂️ Claims Manager — Performance, workloads, cycle time' },
-                      { value: 'ROLE_OPERATIONS_EXEC', label: '📈 Operations Executive — KPIs, TAT, SLA compliance' },
+                      { value: 'ROLE_CLAIMS_ANALYST',  label: roleOption(<FiBarChart2 />,  'Claims Analyst — Trends, denials, cost drivers') },
+                      { value: 'ROLE_CLAIMS_MANAGER',  label: roleOption(<FiFolder />,     'Claims Manager — Performance, workloads, cycle time') },
+                      { value: 'ROLE_OPERATIONS_EXEC', label: roleOption(<FiTrendingUp />, 'Operations Executive — KPIs, TAT, SLA compliance') },
                     ],
                   },
                   {
                     label: 'Risk & Finance',
                     options: [
-                      { value: 'ROLE_FRAUD_ANALYST',   label: '🔍 Fraud Analyst — Risk dashboards, red-flag indicators' },
-                      { value: 'ROLE_ACTUARY',         label: '🧮 Actuary — Severity, frequency, pricing, reserving' },
-                    ],
-                  },
-                  {
-                    label: 'Administration',
-                    options: [
-                      { value: 'ROLE_ADMIN',           label: '🛡️ Admin — Full access, roles, configuration' },
+                      { value: 'ROLE_FRAUD_ANALYST',   label: roleOption(<FiSearch />,     'Fraud Analyst — Risk dashboards, red-flag indicators') },
+                      { value: 'ROLE_ACTUARY',         label: roleOption(<TbAbacus />,     'Actuary — Severity, frequency, pricing, reserving') },
                     ],
                   },
                 ]}
@@ -230,61 +217,24 @@ export default function RegisterPage() {
           </Form.Item>
         </Form>
 
+        <Divider style={{ margin: '16px 0' }} />
         <div style={{ textAlign: 'center' }}>
-          <Text style={{ color: '#64748b', fontSize: 14 }}>
+          <Text style={{ color: '#888', fontSize: 12 }}>
             Already have an account?{' '}
-            <Link to="/login" style={{ color: '#2563eb', fontWeight: 600 }}>
-              Sign in
-            </Link>
+            <Link to="/login" style={{ color: '#2563eb' }}>Sign in</Link>
           </Text>
         </div>
-
-        <Divider style={{ margin: '24px 0 16px' }} />
-        <Text style={{ display: 'block', textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>
-          Protected by enterprise-grade security · All sessions are audited
-        </Text>
       </div>
     </div>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%)',
-    padding: '24px 16px', position: 'relative', overflow: 'hidden',
-  },
-  blobTop: {
-    position: 'absolute', top: '-120px', right: '-100px',
-    width: '400px', height: '400px', borderRadius: '50%',
-    background: 'radial-gradient(circle, rgba(37,99,235,0.25) 0%, transparent 70%)',
-    pointerEvents: 'none',
-  },
-  blobBottom: {
-    position: 'absolute', bottom: '-150px', left: '-120px',
-    width: '500px', height: '500px', borderRadius: '50%',
-    background: 'radial-gradient(circle, rgba(16,185,129,0.15) 0%, transparent 70%)',
-    pointerEvents: 'none',
-  },
-  card: {
-    position: 'relative', zIndex: 1, background: '#ffffff',
-    borderRadius: '16px', padding: '40px 44px',
-    width: '100%', maxWidth: '460px',
-    boxShadow: '0 25px 60px rgba(0,0,0,0.35)',
-  },
-  logoRow:  { display: 'flex', alignItems: 'center', gap: '14px' },
-  logoIcon: {
-    width: '50px', height: '50px', borderRadius: '12px',
-    background: 'linear-gradient(135deg, #1d4ed8, #2563eb)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    boxShadow: '0 4px 14px rgba(37,99,235,0.4)', flexShrink: 0,
-  },
-  label:     { color: '#374151', fontWeight: 600, fontSize: 14 },
-  input:     { borderRadius: '8px', border: '1.5px solid #e2e8f0' },
+  label:     { color: '#555', fontWeight: 600, fontSize: 13 },
+  input:     { borderRadius: '4px', border: '1px solid #ccc' },
   submitBtn: {
-    height: '48px', borderRadius: '10px',
-    background: 'linear-gradient(135deg, #1d4ed8, #2563eb)',
-    border: 'none', fontSize: '16px', fontWeight: 600,
-    letterSpacing: '0.02em', boxShadow: '0 4px 14px rgba(37,99,235,0.4)',
+    height: '38px', borderRadius: '4px',
+    background: '#2563eb', border: 'none',
+    fontSize: '14px', fontWeight: 600,
   },
 };

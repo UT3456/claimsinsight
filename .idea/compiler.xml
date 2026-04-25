@@ -18,11 +18,10 @@
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.38/lombok-1.18.38.jar" />
         </processorPath>
         <module name="claims-metrics-service" />
-        <module name="analytics-report-service" />
+        <module name="cost-reserve-service" />
         <module name="AdjusterAndOperations (1)" />
         <module name="AdjusterAndOperations" />
         <module name="fraud-risk-service" />
-        <module name="cost-reserve-service" />
       </profile>
       <profile name="Annotation profile for fraud-risk-service" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
@@ -35,6 +34,15 @@
         <module name="fraud-risk-service (1)" />
         <module name="data-ingestion-service" />
         <module name="api-gateway" />
+      </profile>
+      <profile name="Annotation profile for analytics-report-service" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.38/lombok-1.18.38.jar" />
+        </processorPath>
+        <module name="analytics-report-service" />
       </profile>
     </annotationProcessing>
   </component>

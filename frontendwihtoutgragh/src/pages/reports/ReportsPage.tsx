@@ -1,0 +1,472 @@
+import { useEffect, useMemo, useReducer, useCallback } from 'react';
+import {
+  Table, Modal, Form, Input, Select, DatePicker, Alert, Tooltip, Popconfirm, Button, Dropdown,
+} from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import dayjs from 'dayjs';
+import { RefreshCw, Plus, Trash2, Download, FileText, FileSpreadsheet, Search, ChevronDown } from 'lucide-react';
+
+import {
+  PageHeader, KpiCard, DataCard, Badge, Chip,
+  GhostButton, DarkButton, EmptyState,
+} from '../../components/ui';
+import type { BadgeTone } from '../../components/ui';
+import { reportsApi, REPORT_SCOPES, type AnalyticsReport, type CreateReportRequest } from '../../api/reportsApi';
+
+const { Option } = Select;
+const { TextArea } = Input;
+
+/**
+ * ReportsPage — reference screen #09.
+ * Layout: PageHeader · 4 KpiCards · filter rail · DataCard table with per-row PDF/CSV export.
+ *
+ * Export strategy (no server-side generation, no pdf libs):
+ *   CSV — client Blob download.
+ *   PDF — open a print-ready window; user uses browser "Save as PDF".
+ */
+
+// ── Reducer ──────────────────────────────────────────────────────────────────
+
+interface State {
+  items: AnalyticsReport[];
+  loading: boolean;
+  error: string | null;
+  modalOpen: boolean;
+  submitting: boolean;
+  filterScope: string | null;
+  search: string;
+}
+
+type Action =
+  | { type: 'FETCH_START' }
+  | { type: 'FETCH_SUCCESS'; payload: AnalyticsReport[] }
+  | { type: 'FETCH_ERROR'; payload: string }
+  | { type: 'OPEN_MODAL' }
+  | { type: 'CLOSE_MODAL' }
+  | { type: 'SUBMIT_START' }
+  | { type: 'SUBMIT_SUCCESS'; payload: AnalyticsReport }
+  | { type: 'SUBMIT_ERROR' }
+  | { type: 'DELETE'; payload: number }
+  | { type: 'SET_FILTER'; payload: string | null }
+  | { type: 'SET_SEARCH'; payload: string };
+
+function reducer(s: State, a: Action): State {
+  switch (a.type) {
+    case 'FETCH_START':    return { ...s, loading: true, error: null };
+    case 'FETCH_SUCCESS':  return { ...s, loading: false, items: a.payload };
+    case 'FETCH_ERROR':    return { ...s, loading: false, error: a.payload };
+    case 'OPEN_MODAL':     return { ...s, modalOpen: true };
+    case 'CLOSE_MODAL':    return { ...s, modalOpen: false, submitting: false };
+    case 'SUBMIT_START':   return { ...s, submitting: true };
+    case 'SUBMIT_SUCCESS': return { ...s, submitting: false, modalOpen: false, items: [a.payload, ...s.items] };
+    case 'SUBMIT_ERROR':   return { ...s, submitting: false };
+    case 'DELETE':         return { ...s, items: s.items.filter(i => i.reportId !== a.payload) };
+    case 'SET_FILTER':     return { ...s, filterScope: a.payload };
+    case 'SET_SEARCH':     return { ...s, search: a.payload };
+    default:               return s;
+  }
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+const SCOPE_TONE: Record<string, BadgeTone> = {
+  PRODUCT: 'blue', REGION: 'teal', CLAIM_TYPE: 'purple', PERIOD: 'amber',
+};
+
+/** Escape a single CSV cell (RFC 4180). */
+function csvCell(v: unknown): string {
+  if (v === null || v === undefined) return '';
+  const s = String(v);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/** Flatten a report's JSON body into key-value rows for CSV/PDF bodies. */
+function extractRows(json: string | null): Array<[string, string]> {
+  if (!json) return [];
+  try {
+    const obj = JSON.parse(json);
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+      return Object.entries(obj).map(([k, v]) => [
+        k,
+        typeof v === 'object' ? JSON.stringify(v) : String(v),
+      ]);
+    }
+  } catch { /* fall through */ }
+  return [['data', String(json)]];
+}
+
+function triggerDownload(filename: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  // revoke a tick later so Safari/Firefox commits the download
+  setTimeout(() => URL.revokeObjectURL(url), 500);
+}
+
+/**
+ * Server-rendered download. Calls GET /reports/{id}/export?format=... and
+ * saves the returned Blob to disk. Falls back to client-side rendering if
+ * the backend endpoint fails for any reason.
+ */
+async function downloadServer(report: AnalyticsReport, format: 'pdf' | 'csv') {
+  try {
+    const { blob, filename } = await reportsApi.export(report.reportId, format);
+    triggerDownload(filename, blob);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(`Server export failed for report ${report.reportId} (${format}), falling back to client.`, err);
+    if (format === 'csv') exportCsv(report);
+    else exportPdf(report);
+  }
+}
+
+function exportCsv(report: AnalyticsReport) {
+  const header = ['Field', 'Value'];
+  const meta: Array<[string, string]> = [
+    ['Report ID',     String(report.reportId)],
+    ['Scope',         report.scope],
+    ['Scope value',   report.scopeValue],
+    ['Metrics',       report.metrics],
+    ['Generated by',  report.generatedBy],
+    ['Generated date', report.generatedDate],
+  ];
+  const body = extractRows(report.reportData);
+  const rows = [header, ...meta, ...(body.length ? [['', '']] : []), ...body];
+  const csv = rows.map(r => r.map(csvCell).join(',')).join('\r\n');
+  const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' });
+  triggerDownload(`report-${report.reportId}-${report.scope.toLowerCase()}.csv`, blob);
+}
+
+function exportCsvAll(reports: AnalyticsReport[]) {
+  if (reports.length === 0) return;
+  const header = ['Report ID', 'Scope', 'Scope value', 'Metrics', 'Generated by', 'Generated date', 'Report data'];
+  const rows = [header, ...reports.map(r => [
+    r.reportId, r.scope, r.scopeValue, r.metrics, r.generatedBy, r.generatedDate, r.reportData ?? '',
+  ])];
+  const csv = rows.map(r => r.map(csvCell).join(',')).join('\r\n');
+  const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' });
+  triggerDownload(`reports-${dayjs().format('YYYYMMDD-HHmm')}.csv`, blob);
+}
+
+function escHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function exportPdf(report: AnalyticsReport) {
+  const rows = extractRows(report.reportData);
+  const w = window.open('', '_blank', 'width=800,height=900');
+  if (!w) { alert('Pop-up blocked — allow pop-ups to export PDF.'); return; }
+  const bodyRows = rows.length
+    ? rows.map(([k, v]) => `<tr><td>${escHtml(k)}</td><td>${escHtml(v)}</td></tr>`).join('')
+    : '<tr><td colspan="2" style="color:#888;padding:12px">No report payload recorded.</td></tr>';
+  const title = `Report #${report.reportId} — ${report.scope}`;
+  w.document.write(`<!doctype html>
+<html><head><meta charset="utf-8"><title>${escHtml(title)}</title>
+<style>
+  body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; color:#222; margin:40px; }
+  h1   { font-size:18px; margin:0 0 4px; letter-spacing:-0.01em; }
+  .sub { color:#666; font-size:12px; margin-bottom:20px; }
+  .meta{ display:grid; grid-template-columns:140px 1fr; gap:4px 16px; font-size:12px; margin-bottom:24px;
+         background:#F8F7F3; padding:12px 16px; border-radius:6px; }
+  .meta b { color:#555; font-weight:500; }
+  h2   { font-size:13px; margin:16px 0 8px; letter-spacing:0.02em; text-transform:uppercase; color:#555; }
+  table{ width:100%; border-collapse:collapse; font-size:12px; }
+  th, td { border:1px solid #e5e5e0; padding:8px 10px; text-align:left; vertical-align:top; }
+  th { background:#F8F7F3; font-weight:500; color:#444; }
+  td:first-child { font-weight:500; width:30%; color:#444; }
+  footer { margin-top:30px; font-size:10px; color:#999; border-top:1px solid #eee; padding-top:10px; }
+  @media print { body { margin:20mm; } }
+</style></head>
+<body>
+  <h1>${escHtml(title)}</h1>
+  <div class="sub">ClaimInsight analytics report</div>
+
+  <div class="meta">
+    <b>Scope</b><span>${escHtml(report.scope)}</span>
+    <b>Scope value</b><span>${escHtml(report.scopeValue)}</span>
+    <b>Metrics</b><span>${escHtml(report.metrics)}</span>
+    <b>Generated by</b><span>${escHtml(report.generatedBy)}</span>
+    <b>Generated date</b><span>${escHtml(report.generatedDate)}</span>
+  </div>
+
+  <h2>Report data</h2>
+  <table><thead><tr><th>Field</th><th>Value</th></tr></thead>
+    <tbody>${bodyRows}</tbody>
+  </table>
+
+  <footer>Generated ${escHtml(dayjs().format('YYYY-MM-DD HH:mm'))} · Use your browser's print dialog → "Save as PDF" to export.</footer>
+  <script>window.addEventListener('load', () => { setTimeout(() => window.print(), 250); });</script>
+</body></html>`);
+  w.document.close();
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
+
+export default function ReportsPage() {
+  const [state, dispatch] = useReducer(reducer, {
+    items: [], loading: false, error: null, modalOpen: false, submitting: false,
+    filterScope: null, search: '',
+  });
+  const [form] = Form.useForm();
+
+  const load = useCallback(async () => {
+    dispatch({ type: 'FETCH_START' });
+    try {
+      const data = state.filterScope
+        ? await reportsApi.getByScope(state.filterScope)
+        : await reportsApi.getAll();
+      dispatch({ type: 'FETCH_SUCCESS', payload: data });
+    } catch { dispatch({ type: 'FETCH_ERROR', payload: 'Failed to load reports.' }); }
+  }, [state.filterScope]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleCreate = async (values: Record<string, unknown>) => {
+    dispatch({ type: 'SUBMIT_START' });
+    try {
+      const req: CreateReportRequest = {
+        scope:         values.scope as string,
+        scopeValue:    values.scopeValue as string,
+        metrics:       values.metrics as string,
+        generatedDate: (values.generatedDate as dayjs.Dayjs).format('YYYY-MM-DD'),
+        generatedBy:   values.generatedBy as string,
+        reportData:    values.reportData as string | undefined,
+      };
+      dispatch({ type: 'SUBMIT_SUCCESS', payload: await reportsApi.create(req) });
+      form.resetFields();
+    } catch { dispatch({ type: 'SUBMIT_ERROR' }); }
+  };
+
+  const handleDelete = async (id: number) => {
+    await reportsApi.delete(id);
+    dispatch({ type: 'DELETE', payload: id });
+  };
+
+  const filtered = useMemo(() => {
+    if (!state.search.trim()) return state.items;
+    const q = state.search.trim().toLowerCase();
+    return state.items.filter(i =>
+      i.scopeValue.toLowerCase().includes(q) ||
+      i.metrics.toLowerCase().includes(q) ||
+      i.generatedBy.toLowerCase().includes(q),
+    );
+  }, [state.items, state.search]);
+
+  const scopeCounts = useMemo(() => (
+    REPORT_SCOPES.reduce((acc, s) => ({
+      ...acc, [s]: state.items.filter(i => i.scope === s).length,
+    }), {} as Record<string, number>)
+  ), [state.items]);
+
+  const withDataCount = state.items.filter(i => !!i.reportData).length;
+
+  const columns: ColumnsType<AnalyticsReport> = [
+    {
+      title: 'ID', dataIndex: 'reportId', key: 'reportId', width: 70,
+      render: v => <span style={{ color: 'var(--ci-text-muted)' }}>#{v}</span>,
+    },
+    {
+      title: 'Scope', dataIndex: 'scope', key: 'scope', width: 110,
+      render: (v: string) => <Badge tone={SCOPE_TONE[v] ?? 'neutral'}>{v}</Badge>,
+    },
+    {
+      title: 'Scope value', dataIndex: 'scopeValue', key: 'scopeValue', width: 140,
+      render: v => <span style={{ fontWeight: 500 }}>{v}</span>,
+    },
+    { title: 'Metrics', dataIndex: 'metrics', key: 'metrics', ellipsis: true,
+      render: v => <span style={{ color: 'var(--ci-text-secondary)' }}>{v}</span> },
+    {
+      title: 'Generated by', dataIndex: 'generatedBy', key: 'generatedBy', width: 140,
+      render: v => <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, monospace', fontSize: 11, color: 'var(--ci-text-muted)' }}>{v}</span>,
+    },
+    {
+      title: 'Date', dataIndex: 'generatedDate', key: 'generatedDate', width: 110,
+      sorter: (a, b) => a.generatedDate.localeCompare(b.generatedDate),
+      render: v => <span style={{ color: 'var(--ci-text-secondary)' }}>{v}</span>,
+    },
+    {
+      title: 'Payload', dataIndex: 'reportData', key: 'reportData', width: 100,
+      render: v => v
+        ? <Badge tone="green">Available</Badge>
+        : <span style={{ color: 'var(--ci-text-muted)', fontSize: 11 }}>—</span>,
+    },
+    {
+      title: '', key: 'action', width: 90, align: 'right',
+      render: (_, rec) => (
+        <div style={{ display: 'inline-flex', gap: 2 }}>
+          <Dropdown
+            menu={{
+              items: [
+                { key: 'csv', icon: <FileSpreadsheet size={12} strokeWidth={1.8} />, label: 'Download CSV', onClick: () => downloadServer(rec, 'csv') },
+                { key: 'pdf', icon: <FileText size={12} strokeWidth={1.8} />,        label: 'Download PDF', onClick: () => downloadServer(rec, 'pdf') },
+              ],
+            }}
+            trigger={['click']}
+          >
+            <Tooltip title="Download">
+              <Button type="text" size="small" icon={<Download size={13} strokeWidth={1.6} />} style={{ color: 'var(--ci-text-muted)' }} />
+            </Tooltip>
+          </Dropdown>
+          <Popconfirm title="Delete this report?" onConfirm={() => handleDelete(rec.reportId)}>
+            <Tooltip title="Delete">
+              <Button type="text" size="small" icon={<Trash2 size={13} strokeWidth={1.6} />} style={{ color: 'var(--ci-text-muted)' }} />
+            </Tooltip>
+          </Popconfirm>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <PageHeader
+        title="Reports"
+        subtitle={`${state.items.length} report${state.items.length === 1 ? '' : 's'} · ${withDataCount} with payload`}
+        actions={
+          <>
+            <Chip
+              dropdown
+              active={!!state.filterScope}
+              onClick={() => {
+                const cycle: (string | null)[] = [null, ...REPORT_SCOPES];
+                const i = cycle.indexOf(state.filterScope);
+                dispatch({ type: 'SET_FILTER', payload: cycle[(i + 1) % cycle.length] });
+              }}
+            >
+              {state.filterScope ?? 'All scopes'}
+            </Chip>
+            <Dropdown
+              trigger={['click']}
+              menu={{
+                items: [
+                  { key: 'csv-all', icon: <FileSpreadsheet size={12} strokeWidth={1.8} />, label: `Export ${filtered.length} row${filtered.length === 1 ? '' : 's'} as CSV`, onClick: () => exportCsvAll(filtered) },
+                ],
+              }}
+              disabled={filtered.length === 0}
+            >
+              <GhostButton disabled={filtered.length === 0} icon={<Download size={12} strokeWidth={1.8} />}>
+                Export <ChevronDown size={11} strokeWidth={2} style={{ marginLeft: 2 }} />
+              </GhostButton>
+            </Dropdown>
+            <GhostButton onClick={load} icon={<RefreshCw size={12} strokeWidth={1.8} />}>
+              Refresh
+            </GhostButton>
+            <DarkButton onClick={() => dispatch({ type: 'OPEN_MODAL' })} icon={<Plus size={12} strokeWidth={2} />}>
+              Generate report
+            </DarkButton>
+          </>
+        }
+      />
+
+      {/* KPI row — scope distribution */}
+      <div style={styles.kpiRow}>
+        <KpiCard label="Total reports" value={state.items.length.toLocaleString()} delta={`${withDataCount} with payload`} deltaDirection="flat" />
+        {REPORT_SCOPES.map(s => (
+          <KpiCard
+            key={s}
+            label={s.replace('_', ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}
+            value={(scopeCounts[s] ?? 0).toLocaleString()}
+            delta={state.items.length ? `${Math.round(((scopeCounts[s] ?? 0) / state.items.length) * 100)}% of total` : '—'}
+            deltaDirection="flat"
+          />
+        ))}
+      </div>
+
+      {state.error && <Alert type="error" showIcon message={state.error} style={{ marginBottom: 12, borderRadius: 8 }} closable />}
+
+      {/* Filter rail */}
+      <div style={styles.filterRow}>
+        <div style={styles.search}>
+          <Search size={12} strokeWidth={1.8} color="var(--ci-text-muted)" />
+          <input
+            style={styles.searchInput}
+            placeholder="Search scope value, metrics, or generator"
+            value={state.search}
+            onChange={e => dispatch({ type: 'SET_SEARCH', payload: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <DataCard padding={0}>
+        {!state.loading && filtered.length === 0 ? (
+          <EmptyState
+            title={state.search || state.filterScope ? 'No matching reports' : 'No reports yet'}
+            description={state.search || state.filterScope ? 'Try clearing filters to view all reports.' : 'Generated analytics will appear here.'}
+            actions={(state.search || state.filterScope) ? (
+              <GhostButton onClick={() => { dispatch({ type: 'SET_FILTER', payload: null }); dispatch({ type: 'SET_SEARCH', payload: '' }); }}>
+                Clear filters
+              </GhostButton>
+            ) : <DarkButton onClick={() => dispatch({ type: 'OPEN_MODAL' })}>Generate report</DarkButton>}
+          />
+        ) : (
+          <Table
+            rowKey="reportId"
+            columns={columns}
+            dataSource={filtered}
+            loading={state.loading}
+            size="small"
+            pagination={{ pageSize: 10, size: 'small', hideOnSinglePage: true }}
+          />
+        )}
+      </DataCard>
+
+      <Modal
+        title="Generate analytics report"
+        open={state.modalOpen}
+        onCancel={() => { dispatch({ type: 'CLOSE_MODAL' }); form.resetFields(); }}
+        onOk={() => form.submit()}
+        confirmLoading={state.submitting}
+        okText="Generate"
+        destroyOnClose
+      >
+        <Form form={form} layout="vertical" onFinish={handleCreate}>
+          <Form.Item name="scope" label="Scope" rules={[{ required: true }]}>
+            <Select placeholder="Select scope">
+              {REPORT_SCOPES.map(s => <Option key={s} value={s}>{s}</Option>)}
+            </Select>
+          </Form.Item>
+          <Form.Item name="scopeValue" label="Scope value" rules={[{ required: true }]}>
+            <Input placeholder="e.g. AUTO, NORTH_EAST, Q1-2026" />
+          </Form.Item>
+          <Form.Item name="metrics" label="Metrics" rules={[{ required: true }]}>
+            <Input placeholder="e.g. TAT, LOSS_RATIO, CYCLE_TIME" />
+          </Form.Item>
+          <Form.Item name="generatedBy" label="Generated by" rules={[{ required: true }]}>
+            <Input placeholder="username" />
+          </Form.Item>
+          <Form.Item name="generatedDate" label="Generated date" rules={[{ required: true }]}>
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="reportData" label="Report data (optional JSON)">
+            <TextArea rows={4} placeholder='{"summary": "...", "avgTat": 7.2}' />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  );
+}
+
+const styles: Record<string, React.CSSProperties> = {
+  kpiRow: {
+    display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16,
+  },
+  filterRow: { display: 'flex', gap: 8, marginBottom: 12 },
+  search: {
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    height: 28, padding: '0 10px',
+    border: '1px solid var(--ci-border-strong)',
+    borderRadius: 'var(--ci-radius-input)',
+    background: 'var(--ci-bg-surface)',
+  },
+  searchInput: {
+    border: 'none', outline: 'none', background: 'transparent',
+    fontSize: 11, color: 'var(--ci-text-primary)',
+    width: 280,
+  },
+};

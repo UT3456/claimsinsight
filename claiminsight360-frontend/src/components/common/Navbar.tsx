@@ -8,6 +8,7 @@ import {
 import { useNavigate }       from 'react-router-dom';
 import { useAuth }           from '../../hooks/useAuth';
 import NotificationBell      from './NotificationBell';
+import ThemeToggle           from './ThemeToggle';
 
 const { Text } = Typography;
 
@@ -43,22 +44,26 @@ export default function Navbar({ collapsed, onToggle }: NavbarProps) {
       <div style={styles.left}>
         <button style={styles.toggleBtn} onClick={onToggle} aria-label="Toggle sidebar">
           {collapsed
-            ? <MenuUnfoldOutlined style={{ fontSize: 18, color: '#475569' }} />
-            : <MenuFoldOutlined   style={{ fontSize: 18, color: '#475569' }} />}
+            ? <MenuUnfoldOutlined style={{ fontSize: 18, color: 'var(--ci-text-secondary)' }} />
+            : <MenuFoldOutlined   style={{ fontSize: 18, color: 'var(--ci-text-secondary)' }} />}
         </button>
 
         {collapsed && (
           <div style={styles.brand}>
             <SafetyCertificateOutlined style={{ color: '#2563eb', fontSize: 20 }} />
-            <Text strong style={{ color: '#0f172a', fontSize: 16, marginLeft: 8 }}>
+            <Text strong style={{ color: 'var(--ci-text-primary)', fontSize: 16, marginLeft: 8 }}>
               ClaimInsight<span style={{ color: '#2563eb' }}>360</span>
             </Text>
           </div>
         )}
       </div>
 
-      {/* Right — bell + user */}
+      {/* Right — theme toggle + bell + user */}
       <div style={styles.right}>
+        <ThemeToggle />
+
+        <div style={styles.divider} />
+
         <NotificationBell />
 
         <div style={styles.divider} />
@@ -66,12 +71,12 @@ export default function Navbar({ collapsed, onToggle }: NavbarProps) {
         <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
           <div style={styles.userArea}>
             <Avatar
-              style={{ backgroundColor: '#1d4ed8', flexShrink: 0 }}
+              style={{ backgroundColor: '#2563eb', flexShrink: 0 }}
               icon={<UserOutlined />}
-              size={34}
+              size={28}
             />
             <div style={styles.userInfo}>
-              <Text strong style={{ fontSize: 13, color: '#0f172a', display: 'block', lineHeight: 1.3 }}>
+              <Text strong style={{ fontSize: 13, color: 'var(--ci-text-primary)', display: 'block', lineHeight: 1.3 }}>
                 {username}
               </Text>
               <Tag color={roleColor} style={{ fontSize: 10, padding: '0 6px', lineHeight: '18px', marginTop: 1 }}>
@@ -87,27 +92,27 @@ export default function Navbar({ collapsed, onToggle }: NavbarProps) {
 
 const styles: Record<string, React.CSSProperties> = {
   navbar: {
-    height: 64, background: '#fff',
-    borderBottom: '1px solid #e2e8f0',
+    height: 50, background: 'var(--ci-bg-surface)',
+    borderBottom: '1px solid var(--ci-border)',
     display: 'flex', alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '0 20px 0 8px',
+    padding: '0 16px 0 8px',
     position: 'sticky', top: 0, zIndex: 100,
-    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+    boxShadow: 'none',
   },
-  left:      { display: 'flex', alignItems: 'center', gap: 12 },
+  left:      { display: 'flex', alignItems: 'center', gap: 8 },
   right:     { display: 'flex', alignItems: 'center', gap: 8 },
   toggleBtn: {
     background: 'none', border: 'none', cursor: 'pointer',
-    width: 40, height: 40, borderRadius: 8, display: 'flex',
+    width: 36, height: 36, borderRadius: 4, display: 'flex',
     alignItems: 'center', justifyContent: 'center',
   },
   brand:    { display: 'flex', alignItems: 'center' },
-  divider:  { width: 1, height: 28, background: '#e2e8f0', margin: '0 4px' },
+  divider:  { width: 1, height: 22, background: 'var(--ci-border)', margin: '0 2px' },
   userArea: {
-    display: 'flex', alignItems: 'center', gap: 10,
+    display: 'flex', alignItems: 'center', gap: 8,
     cursor: 'pointer', padding: '4px 8px',
-    borderRadius: 10, transition: 'background 0.2s',
+    borderRadius: 4,
   },
   userInfo: { display: 'flex', flexDirection: 'column' },
 };

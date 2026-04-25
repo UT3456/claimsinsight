@@ -7,6 +7,11 @@ import { PlusOutlined, ReloadOutlined, DeleteOutlined, BankOutlined } from '@ant
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { reservesApi, ClaimReserve, CreateReserveRequest } from '../../api/financialApi';
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer,
+  CartesianGrid, BarChart, Bar, Cell,
+} from 'recharts';
+import ChartCard, { CHART_COLORS, CHART_PALETTE } from '../../components/charts/ChartCard';
 
 const { Title, Text } = Typography;
 
@@ -98,6 +103,23 @@ export default function ReservesPage() {
     ? (state.items.reduce((s, i) => s + i.reserveAmount, 0) / state.items.length)
     : 0;
 
+  // ── Chart data ────────────────────────────────────────────────────────────
+  const reserveTrend = Object.entries(
+    state.items.reduce<Record<string, number>>((acc, r) => {
+      const m = r.updatedDate?.slice(0, 7);
+      if (!m) return acc;
+      acc[m] = (acc[m] ?? 0) + r.reserveAmount;
+      return acc;
+    }, {}),
+  )
+    .map(([month, total]) => ({ month, total: Number(total.toFixed(2)) }))
+    .sort((a, b) => a.month.localeCompare(b.month));
+
+  const topClaims = [...state.items]
+    .sort((a, b) => b.reserveAmount - a.reserveAmount)
+    .slice(0, 10)
+    .map(r => ({ name: r.claimId, amount: Number(r.reserveAmount.toFixed(0)) }));
+
   const columns: ColumnsType<ClaimReserve> = [
     { title: 'Reserve ID',     dataIndex: 'reserveId',     key: 'reserveId',     width: 110 },
     { title: 'Claim ID',       dataIndex: 'claimId',       key: 'claimId',       render: v => <Text code>{v}</Text> },
@@ -154,6 +176,52 @@ export default function ReservesPage() {
       </Row>
 
       {state.error && <Alert type="error" message={state.error} style={{ marginBottom: 16 }} />}
+
+      {/* Charts */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col xs={24} lg={14}>
+          <ChartCard
+            title="Reserve Trend"
+            subtitle="Total reserve set aside per month"
+            loading={state.loading}
+            isEmpty={!state.loading && reserveTrend.length === 0}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={reserveTrend} margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--ci-border)" />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} />
+                <RTooltip formatter={(v) => `$${Number(v).toLocaleString()}`}
+                  contentStyle={{ background: 'var(--ci-bg-surface)', border: '1px solid var(--ci-border)', borderRadius: 8 }} />
+                <Line type="monotone" dataKey="total" stroke={CHART_COLORS.success}
+                  strokeWidth={2.5} dot={{ r: 4, fill: CHART_COLORS.success }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Col>
+
+        <Col xs={24} lg={10}>
+          <ChartCard
+            title="Top 10 Reserves by Claim"
+            subtitle="Highest reserve amounts booked"
+            loading={state.loading}
+            isEmpty={!state.loading && topClaims.length === 0}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={topClaims} layout="vertical" margin={{ top: 10, right: 20, bottom: 0, left: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--ci-border)" />
+                <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--ci-text-secondary)' }} />
+                <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 10, fill: 'var(--ci-text-secondary)' }} />
+                <RTooltip formatter={(v) => `$${Number(v).toLocaleString()}`}
+                  contentStyle={{ background: 'var(--ci-bg-surface)', border: '1px solid var(--ci-border)', borderRadius: 8 }} />
+                <Bar dataKey="amount" radius={[0, 6, 6, 0]}>
+                  {topClaims.map((_, i) => <Cell key={i} fill={CHART_PALETTE[i % CHART_PALETTE.length]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Col>
+      </Row>
 
       <Table
         rowKey="reserveId"

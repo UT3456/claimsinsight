@@ -54,6 +54,11 @@ spring:
           predicates:
             - Path=/api/kpis/**
 
+        - id: claims-metrics-claim-status
+          uri: lb://claims-metrics-service
+          predicates:
+            - Path=/api/claim-status/**
+
         # ── Cost Reserve Service (port 8089) ────────────────────────────────
         - id: cost-reserve-costs
           uri: lb://cost-reserve-service

@@ -1,10 +1,9 @@
 import { useEffect, useReducer, useCallback } from 'react';
 import {
-  Table, Button, Modal, Form, Input, Select,
-  Typography, Space, Tag, Alert, Tooltip, Popconfirm, Card, Row, Col, Statistic, Badge,
+  Button, Modal, Form, Input, Select,
+  Typography, Space, Tag, Popconfirm, Card, Row, Col,
 } from 'antd';
-import { PlusOutlined, ReloadOutlined, DeleteOutlined, BellOutlined, CheckOutlined } from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
+import { PlusOutlined, ReloadOutlined, DeleteOutlined, CheckOutlined } from '@ant-design/icons';
 import {
   notificationsApi, Notification, CreateNotificationRequest,
   NOTIFICATION_CATEGORIES, NOTIFICATION_STATUSES,
@@ -15,6 +14,26 @@ import { selectUserId } from '../../store/slices/authSlice';
 const { Title, Text } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
+
+// ── Category dot colours ──────────────────────────────────────────────────────
+const CAT_DOT: Record<string, string> = {
+  RISK: '#dc2626', DENIAL: '#f59e0b', COST: '#2563eb',
+  PERFORMANCE: '#7c3aed', AGING: '#d97706', SYSTEM: '#6b7280',
+};
+const CAT_TAG: Record<string, string> = {
+  RISK: 'red', DENIAL: 'orange', COST: 'blue',
+  PERFORMANCE: 'purple', AGING: 'gold', SYSTEM: 'default',
+};
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1)  return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
 
 // ── Reducer ───────────────────────────────────────────────────────────────────
 
@@ -72,13 +91,6 @@ function reducer(state: State, action: Action): State {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-
-const CAT_COLORS: Record<string, string> = {
-  RISK: 'red', DENIAL: 'orange', COST: 'gold', PERFORMANCE: 'blue', AGING: 'purple', SYSTEM: 'default',
-};
-const STATUS_COLORS: Record<string, string> = {
-  UNREAD: 'blue', READ: 'default', DISMISSED: 'default', ACTIONED: 'green',
-};
 
 export default function NotificationsPage() {
   const userId = useSelector(selectUserId) ?? 1;
@@ -142,101 +154,123 @@ export default function NotificationsPage() {
     dispatch({ type: 'STATUS_UPDATED', payload: updated });
   };
 
-  const columns: ColumnsType<Notification> = [
-    { title: 'ID',       dataIndex: 'notificationId', key: 'notificationId', width: 80 },
-    {
-      title: 'Status',   dataIndex: 'status',          key: 'status',
-      render: (v, rec) => (
-        <Select size="small" value={v} style={{ width: 110 }}
-          onChange={s => handleStatusChange(rec.notificationId, s)}>
-          {NOTIFICATION_STATUSES.map(s => (
-            <Option key={s} value={s}><Tag color={STATUS_COLORS[s]}>{s}</Tag></Option>
-          ))}
-        </Select>
-      ),
-      filters: NOTIFICATION_STATUSES.map(s => ({ text: s, value: s })),
-      onFilter: (value, rec) => rec.status === value,
-    },
-    {
-      title: 'Category', dataIndex: 'category',        key: 'category',
-      render: v => <Tag color={CAT_COLORS[v] ?? 'default'}>{v}</Tag>,
-      filters: NOTIFICATION_CATEGORIES.map(c => ({ text: c, value: c })),
-      onFilter: (value, rec) => rec.category === value,
-    },
-    { title: 'Title',   dataIndex: 'title',            key: 'title',         ellipsis: true },
-    { title: 'Message', dataIndex: 'message',          key: 'message',       ellipsis: true },
-    { title: 'Created', dataIndex: 'createdDate',      key: 'createdDate',   sorter: (a, b) => a.createdDate.localeCompare(b.createdDate) },
-    {
-      title: 'Action', key: 'action', width: 80,
-      render: (_, rec) => (
-        <Popconfirm title="Delete notification?" onConfirm={() => handleDelete(rec.notificationId)}>
-          <Tooltip title="Delete"><Button icon={<DeleteOutlined />} size="small" danger /></Tooltip>
-        </Popconfirm>
-      ),
-    },
-  ];
-
-  const readCount      = state.items.filter(i => i.status === 'READ').length;
-  const actionedCount  = state.items.filter(i => i.status === 'ACTIONED').length;
+  const readCount     = state.items.filter(i => i.status === 'READ').length;
+  const actionedCount = state.items.filter(i => i.status === 'ACTIONED').length;
 
   return (
     <div>
-      <div style={styles.header}>
+      {/* ── Header ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <Title level={3} style={{ margin: 0 }}>
-            <Badge count={state.unreadCount} offset={[10, 0]}>
-              Notifications
-            </Badge>
+          <Title level={4} style={{ margin: 0, color: 'var(--ci-text-primary)' }}>
+            Notifications
+            {state.unreadCount > 0 && (
+              <span style={{
+                marginLeft: 8, fontSize: 11, fontWeight: 600,
+                background: '#dc2626', color: '#fff',
+                borderRadius: 10, padding: '1px 7px',
+              }}>
+                {state.unreadCount}
+              </span>
+            )}
           </Title>
-          <Text type="secondary">System and workflow notifications</Text>
+          <Text style={{ fontSize: 12, color: 'var(--ci-text-muted)' }}>System and workflow notifications</Text>
         </div>
-        <Space wrap>
-          <Select allowClear placeholder="Category" style={{ width: 140 }}
+        <Space wrap size={8}>
+          <Select allowClear placeholder="Category" style={{ width: 130, fontSize: 12 }}
             value={state.filterCategory}
             onChange={v => dispatch({ type: 'SET_CATEGORY', payload: v ?? null })}>
             {NOTIFICATION_CATEGORIES.map(c => <Option key={c} value={c}>{c}</Option>)}
           </Select>
-          <Select allowClear placeholder="Status" style={{ width: 130 }}
+          <Select allowClear placeholder="Status" style={{ width: 120, fontSize: 12 }}
             value={state.filterStatus}
             onChange={v => dispatch({ type: 'SET_STATUS', payload: v ?? null })}>
             {NOTIFICATION_STATUSES.map(s => <Option key={s} value={s}>{s}</Option>)}
           </Select>
-          <Button icon={<CheckOutlined />} onClick={handleMarkAllRead}>Mark All Read</Button>
-          <Button icon={<ReloadOutlined />} onClick={load}>Refresh</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => dispatch({ type: 'OPEN_MODAL' })}>
+          <Button size="small" icon={<CheckOutlined />} onClick={handleMarkAllRead}>Mark All Read</Button>
+          <Button size="small" icon={<ReloadOutlined />} onClick={load}>Refresh</Button>
+          <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => dispatch({ type: 'OPEN_MODAL' })}>
             New
           </Button>
         </Space>
       </div>
 
-      <Row gutter={16} style={{ marginBottom: 24 }}>
+      {/* ── Stat row ── */}
+      <Row gutter={10} style={{ marginBottom: 20 }}>
         {[
-          { title: 'Total',    value: state.items.length,  color: '#2563eb' },
-          { title: 'Unread',   value: state.unreadCount,   color: '#dc2626' },
-          { title: 'Read',     value: readCount,           color: '#16a34a' },
-          { title: 'Actioned', value: actionedCount,       color: '#7c3aed' },
+          { label: 'Total',    value: state.items.length, color: '#2563eb' },
+          { label: 'Unread',   value: state.unreadCount,  color: '#dc2626' },
+          { label: 'Read',     value: readCount,          color: '#16a34a' },
+          { label: 'Actioned', value: actionedCount,      color: '#7c3aed' },
         ].map(c => (
-          <Col xs={12} sm={6} key={c.title}>
-            <Card style={styles.statCard}>
-              <Statistic title={c.title} value={c.value}
-                valueStyle={{ color: c.color }} prefix={<BellOutlined />} />
-            </Card>
+          <Col xs={12} sm={6} key={c.label}>
+            <div className="ci-stat">
+              <div className="ci-stat-lbl">{c.label}</div>
+              <div className="ci-stat-val" style={{ color: c.color }}>{c.value}</div>
+            </div>
           </Col>
         ))}
       </Row>
 
-      {state.error && <Alert type="error" message={state.error} style={{ marginBottom: 16 }} />}
+      {state.error && (
+        <div className="ci-alert ci-alert-red" style={{ marginBottom: 14 }}>{state.error}</div>
+      )}
 
-      <Table
-        rowKey="notificationId"
-        columns={columns}
-        dataSource={state.items}
+      {/* ── Notification list ── */}
+      <Card
+        style={{ border: '1px solid var(--ci-border)', borderRadius: 4, boxShadow: 'none' }}
+        bodyStyle={{ padding: 0 }}
         loading={state.loading}
-        pagination={{ pageSize: 10 }}
-        bordered size="middle"
-        rowClassName={rec => rec.status === 'UNREAD' ? 'unread-row' : ''}
-      />
+      >
+        {state.items.length === 0 && !state.loading && (
+          <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--ci-text-muted)', fontSize: 13 }}>
+            No notifications found
+          </div>
+        )}
+        {state.items.map(n => (
+          <div
+            key={n.notificationId}
+            className={`ci-notif-item${n.status === 'UNREAD' ? ' unread' : ''}`}
+          >
+            {/* coloured dot */}
+            <div
+              className="ci-notif-dot"
+              style={{
+                background: n.status === 'READ' || n.status === 'DISMISSED'
+                  ? '#d1d5db'
+                  : (CAT_DOT[n.category] ?? '#6b7280'),
+              }}
+            />
 
+            {/* body */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="ci-notif-title">{n.title}</div>
+              <div className="ci-notif-message">{n.message}</div>
+              <div style={{ marginTop: 4, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Tag color={CAT_TAG[n.category] ?? 'default'} style={{ fontSize: 10, margin: 0 }}>{n.category}</Tag>
+                <Select
+                  size="small"
+                  value={n.status}
+                  style={{ width: 110, fontSize: 11 }}
+                  onChange={s => handleStatusChange(n.notificationId, s)}
+                >
+                  {NOTIFICATION_STATUSES.map(s => <Option key={s} value={s}>{s}</Option>)}
+                </Select>
+              </div>
+            </div>
+
+            {/* time + delete */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+              <span className="ci-notif-time">{relativeTime(n.createdDate)}</span>
+              <Popconfirm title="Delete notification?" onConfirm={() => handleDelete(n.notificationId)}>
+                <Button icon={<DeleteOutlined />} size="small" type="text" danger />
+              </Popconfirm>
+            </div>
+          </div>
+        ))}
+      </Card>
+
+      {/* ── Create modal ── */}
       <Modal
         title="Create Notification"
         open={state.modalOpen}
@@ -245,8 +279,7 @@ export default function NotificationsPage() {
         confirmLoading={state.submitting}
         destroyOnClose
       >
-        <Form form={form} layout="vertical" onFinish={handleCreate}
-          initialValues={{ userId }}>
+        <Form form={form} layout="vertical" onFinish={handleCreate} initialValues={{ userId }}>
           <Form.Item name="userId" label="User ID" rules={[{ required: true }]}>
             <Input type="number" min={1} />
           </Form.Item>
@@ -259,7 +292,7 @@ export default function NotificationsPage() {
           <Form.Item name="category" label="Category" rules={[{ required: true }]}>
             <Select placeholder="Select category">
               {NOTIFICATION_CATEGORIES.map(c => (
-                <Option key={c} value={c}><Tag color={CAT_COLORS[c]}>{c}</Tag></Option>
+                <Option key={c} value={c}><Tag color={CAT_TAG[c]}>{c}</Tag></Option>
               ))}
             </Select>
           </Form.Item>
@@ -271,8 +304,3 @@ export default function NotificationsPage() {
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  header:   { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 },
-  statCard: { borderRadius: 10, border: '1px solid #e2e8f0' },
-};

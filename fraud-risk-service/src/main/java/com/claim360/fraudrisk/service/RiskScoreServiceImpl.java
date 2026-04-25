@@ -1,7 +1,7 @@
 package com.claim360.fraudrisk.service;
 
 import com.claim360.fraudrisk.client.NotificationServiceClient;
-import com.claim360.fraudrisk.client.dto.NotificationRequestDTO;
+import com.claim360.fraudrisk.client.dto.NotificationDispatchRequestDTO;
 import com.claim360.fraudrisk.dto.RiskScoreRequest;
 import com.claim360.fraudrisk.dto.RiskScoreResponse;
 import com.claim360.fraudrisk.entity.RiskScore;
@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -22,7 +23,6 @@ import java.util.stream.Collectors;
 public class RiskScoreServiceImpl implements RiskScoreService {
 
     private static final double HIGH_RISK_THRESHOLD = 75.0;
-    private static final long SYSTEM_USER_ID = 1L;
 
     private final RiskScoreRepository riskScoreRepository;
     private final ModelMapper modelMapper;
@@ -40,21 +40,22 @@ public class RiskScoreServiceImpl implements RiskScoreService {
         RiskScore saved = riskScoreRepository.save(score);
         log.info("RiskScore created with ID: {}", saved.getScoreId());
 
-        // Alert via NotificationService when risk score exceeds high-risk threshold
+        // Alert via NotificationService when risk score exceeds high-risk threshold.
+        // Dispatch to FRAUD analysts (who triage) + MANAGER (who approves holds).
         if (saved.getScoreValue() >= HIGH_RISK_THRESHOLD && notificationServiceClient != null) {
             try {
-                NotificationRequestDTO notification = NotificationRequestDTO.builder()
-                        .userId(SYSTEM_USER_ID)
+                NotificationDispatchRequestDTO notification = NotificationDispatchRequestDTO.builder()
+                        .targetRoles(Set.of("FRAUD", "MANAGER"))
                         .title("High Fraud Risk Alert — " + saved.getClaimId())
                         .message(String.format("Claim %s has been assigned a fraud risk score of %.1f, which exceeds the high-risk threshold of %.1f.",
                                 saved.getClaimId(), saved.getScoreValue(), HIGH_RISK_THRESHOLD))
                         .category("RISK")
                         .referenceId(saved.getClaimId())
                         .build();
-                notificationServiceClient.createNotification(notification);
-                log.info("High-risk alert sent for claimId {} (score={})", saved.getClaimId(), saved.getScoreValue());
+                notificationServiceClient.dispatchNotification(notification);
+                log.info("High-risk alert dispatched for claimId {} (score={})", saved.getClaimId(), saved.getScoreValue());
             } catch (Exception ex) {
-                log.warn("Failed to send high-risk notification for claimId {} — NotificationService may be unavailable", saved.getClaimId());
+                log.warn("Failed to dispatch high-risk notification for claimId {} — NotificationService may be unavailable", saved.getClaimId());
             }
         }
 

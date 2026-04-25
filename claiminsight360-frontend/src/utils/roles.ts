@@ -41,14 +41,16 @@ export const ROUTE_ROLES: Record<string, AppRole[]> = {
   '/ingestion/raw':    [ROLES.CLAIMS_ANALYST, ROLES.ADMIN],
   '/adjusters':        [ROLES.CLAIMS_MANAGER, ROLES.OPERATIONS_EXEC, ROLES.ADMIN],
   '/sla-violations':   [ROLES.CLAIMS_MANAGER, ROLES.OPERATIONS_EXEC, ROLES.ADMIN],
-  '/costs':            [ROLES.ACTUARY, ROLES.CLAIMS_MANAGER, ROLES.ADMIN],
-  '/reserves':         [ROLES.ACTUARY, ROLES.CLAIMS_MANAGER, ROLES.ADMIN],
+  '/costs':            [ROLES.ACTUARY, ROLES.CLAIMS_MANAGER, ROLES.CLAIMS_ANALYST, ROLES.OPERATIONS_EXEC, ROLES.ADMIN],
+  '/reserves':         [ROLES.ACTUARY, ROLES.CLAIMS_MANAGER, ROLES.OPERATIONS_EXEC, ROLES.ADMIN],
   '/aging':            [ROLES.ACTUARY, ROLES.CLAIMS_MANAGER, ROLES.ADMIN],
   '/fraud-risk':       [ROLES.FRAUD_ANALYST, ROLES.ADMIN],
-  '/denial-leakage':   [ROLES.CLAIMS_ANALYST, ROLES.FRAUD_ANALYST, ROLES.ADMIN],
+  '/denial-leakage':   [ROLES.CLAIMS_ANALYST, ROLES.CLAIMS_MANAGER, ROLES.FRAUD_ANALYST, ROLES.ADMIN],
   '/reports':          [ROLES.CLAIMS_ANALYST, ROLES.CLAIMS_MANAGER, ROLES.FRAUD_ANALYST, ROLES.ACTUARY, ROLES.OPERATIONS_EXEC, ROLES.ADMIN],
   '/notifications':    [ROLES.CLAIMS_ANALYST, ROLES.CLAIMS_MANAGER, ROLES.FRAUD_ANALYST, ROLES.ACTUARY, ROLES.OPERATIONS_EXEC, ROLES.ADMIN],
-  '/admin/audit-logs': [ROLES.ADMIN],
+  '/admin/audit-logs':      [ROLES.ADMIN],
+  '/admin/kpi-definitions': [ROLES.ADMIN],
+  '/admin/users':           [ROLES.ADMIN],
 };
 
 /** Returns true if the given role can access the given route. */

@@ -1,11 +1,15 @@
 package com.claims.service;
 
+import com.claims.client.NotificationServiceClient;
+import com.claims.client.dto.NotificationRequestDTO;
 import com.claims.dto.request.ClaimReserveRequest;
 import com.claims.dto.response.ClaimReserveResponse;
 import com.claims.entity.ClaimReserve;
 import com.claims.exception.ResourceNotFoundException;
 import com.claims.repository.ClaimReserveRepository;
 import org.modelmapper.ModelMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -20,13 +24,43 @@ import java.util.stream.Collectors;
 @Service
 public class ClaimReserveServiceImpl implements ClaimReserveService {
 
+    private static final Logger log = LoggerFactory.getLogger(ClaimReserveServiceImpl.class);
+
+    /** Threshold for "large reserve" alerts — configurable via application.properties. */
+    private static final BigDecimal LARGE_RESERVE_THRESHOLD = BigDecimal.valueOf(100_000);
+
     private final ClaimReserveRepository claimReserveRepository;
     private final ModelMapper modelMapper;
+
+    /** Optional: null when NotificationService is unreachable. */
+    @Autowired(required = false)
+    private NotificationServiceClient notificationServiceClient;
 
     @Autowired
     public ClaimReserveServiceImpl(ClaimReserveRepository claimReserveRepository, ModelMapper modelMapper) {
         this.claimReserveRepository = claimReserveRepository;
         this.modelMapper = modelMapper;
+    }
+
+    private void sendLargeReserveNotification(ClaimReserve reserve, BigDecimal previousAmount) {
+        if (notificationServiceClient == null) return;
+        try {
+            String msg = previousAmount == null
+                    ? "New reserve of $" + reserve.getReserveAmount() + " opened for claim " + reserve.getClaimId()
+                    : "Reserve on claim " + reserve.getClaimId() + " increased from $"
+                        + previousAmount + " to $" + reserve.getReserveAmount();
+            NotificationRequestDTO notification = NotificationRequestDTO.builder()
+                    .userId(1L)
+                    .title("Large Reserve Alert - Claim " + reserve.getClaimId())
+                    .message(msg + ". Reserve exceeds the $100K threshold — managerial review required.")
+                    .category("COST")
+                    .referenceId(reserve.getClaimId())
+                    .build();
+            notificationServiceClient.createNotification(notification);
+            log.info("Sent COST reserve notification for claim {}", reserve.getClaimId());
+        } catch (Exception e) {
+            log.warn("Failed to send reserve notification for claim {}: {}", reserve.getClaimId(), e.getMessage());
+        }
     }
 
     // -------------------------------------------------------
@@ -37,6 +71,10 @@ public class ClaimReserveServiceImpl implements ClaimReserveService {
     public ClaimReserveResponse createClaimReserve(ClaimReserveRequest request) {
         ClaimReserve reserve = modelMapper.map(request, ClaimReserve.class);
         ClaimReserve saved = claimReserveRepository.save(reserve);
+        if (saved.getReserveAmount() != null
+                && saved.getReserveAmount().compareTo(LARGE_RESERVE_THRESHOLD) >= 0) {
+            sendLargeReserveNotification(saved, null);
+        }
         return modelMapper.map(saved, ClaimReserveResponse.class);
     }
 
@@ -57,8 +95,18 @@ public class ClaimReserveServiceImpl implements ClaimReserveService {
     @Override
     public ClaimReserveResponse updateClaimReserve(Long reserveId, ClaimReserveRequest request) {
         ClaimReserve existing = findReserveByIdOrThrow(reserveId);
+        BigDecimal previousAmount = existing.getReserveAmount();
         modelMapper.map(request, existing);
         ClaimReserve updated = claimReserveRepository.save(existing);
+
+        // Notify when reserve *crosses into* the large-reserve tier on update
+        boolean wasBelow = previousAmount == null || previousAmount.compareTo(LARGE_RESERVE_THRESHOLD) < 0;
+        boolean nowAbove = updated.getReserveAmount() != null
+                && updated.getReserveAmount().compareTo(LARGE_RESERVE_THRESHOLD) >= 0;
+        if (wasBelow && nowAbove) {
+            sendLargeReserveNotification(updated, previousAmount);
+        }
+
         return modelMapper.map(updated, ClaimReserveResponse.class);
     }
 

@@ -11,6 +11,11 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { claimsApi, ClaimKpi, METRIC_NAMES } from '../../api/claimsApi';
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer,
+  CartesianGrid, Legend, BarChart, Bar, Cell,
+} from 'recharts';
+import ChartCard, { CHART_PALETTE } from '../../components/charts/ChartCard';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -131,6 +136,27 @@ export default function ClaimsPage() {
     ? (state.items.reduce((s, i) => s + i.metricValue, 0) / state.items.length).toFixed(2)
     : '—';
 
+  // ── Chart data ────────────────────────────────────────────────────────────
+  // Average value per metric across all claims
+  const metricAverages = METRIC_NAMES.map(m => {
+    const vals = state.items.filter(i => i.metricName === m);
+    const avg = vals.length ? vals.reduce((s, i) => s + i.metricValue, 0) / vals.length : 0;
+    return { name: m, avg: Number(avg.toFixed(2)), count: vals.length };
+  }).filter(x => x.count > 0);
+
+  // Trend per metric over time (grouped by date)
+  const dates = Array.from(new Set(state.items.map(i => i.metricDate))).sort();
+  const trendData = dates.map(d => {
+    const row: Record<string, string | number> = { date: d };
+    METRIC_NAMES.forEach(m => {
+      const matches = state.items.filter(i => i.metricDate === d && i.metricName === m);
+      if (matches.length) {
+        row[m] = Number((matches.reduce((s, v) => s + v.metricValue, 0) / matches.length).toFixed(2));
+      }
+    });
+    return row;
+  });
+
   const columns: ColumnsType<ClaimKpi> = [
     { title: 'KPI ID',       dataIndex: 'kpiId',       key: 'kpiId',       width: 80 },
     { title: 'Claim ID',     dataIndex: 'claimId',     key: 'claimId',     render: v => <Text code>{v}</Text> },
@@ -220,6 +246,56 @@ export default function ClaimsPage() {
       </Space>
 
       {state.error && <Alert type="error" message={state.error} style={{ marginBottom: 16 }} />}
+
+      {/* Charts */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col xs={24} lg={14}>
+          <ChartCard
+            title="KPI Trends Over Time"
+            subtitle="Average metric value per date (all metrics)"
+            loading={state.loading}
+            isEmpty={!state.loading && trendData.length === 0}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={trendData} margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--ci-border)" />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} />
+                <RTooltip contentStyle={{ background: 'var(--ci-bg-surface)', border: '1px solid var(--ci-border)', borderRadius: 8 }} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                {METRIC_NAMES.map((m, i) => (
+                  <Line key={m} type="monotone" dataKey={m}
+                    stroke={CHART_PALETTE[i % CHART_PALETTE.length]}
+                    strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Col>
+
+        <Col xs={24} lg={10}>
+          <ChartCard
+            title="Average KPI Value by Metric"
+            subtitle="Mean across all recorded claims"
+            loading={state.loading}
+            isEmpty={!state.loading && metricAverages.length === 0}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={metricAverages} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--ci-border)" />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--ci-text-secondary)' }} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} />
+                <RTooltip contentStyle={{ background: 'var(--ci-bg-surface)', border: '1px solid var(--ci-border)', borderRadius: 8 }} />
+                <Bar dataKey="avg" radius={[6, 6, 0, 0]}>
+                  {metricAverages.map((_, i) => (
+                    <Cell key={i} fill={CHART_PALETTE[i % CHART_PALETTE.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Col>
+      </Row>
 
       <Table
         rowKey="kpiId"

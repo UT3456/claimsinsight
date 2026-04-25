@@ -1,10 +1,10 @@
 -- ====================================================================
--- ClaimInsight360 — Comprehensive Seed Data Script
+-- ClaimInsight360 - Comprehensive Seed Data Script
 -- Run this directly against MySQL:
 --   mysql -u root -proot < seed_all_databases.sql
 --
 -- Covers all 7 business databases.
--- Uses INSERT IGNORE — safe to re-run without duplicating rows.
+-- Uses INSERT IGNORE - safe to re-run without duplicating rows.
 -- ====================================================================
 
 -- ====================================================================
@@ -36,27 +36,27 @@ INSERT IGNORE INTO claim (claim_id, policy_id, customer_id, claim_type, claim_st
 (19, 119, 219, 'Liability', 'Open',               '2026-02-20', NULL,         52000.00),
 (20, 120, 220, 'Auto',      'Approved',           '2026-03-02', '2026-03-12', 2800.00);
 
--- ── adjuster_performance (15 rows — 5 adjusters × 3 periods) ─────────
+-- ── adjuster_performance (15 rows - 5 adjusters × 3 periods) ─────────
 INSERT IGNORE INTO adjuster_performance
   (perf_id, adjuster_id, claims_handled, total_days_taken, avg_tat, quality_score, sla_met_count, sla_breached_count, denied_claims_count, error_rate, period)
 VALUES
--- Adjuster 1: Mike Torres — strong volume, occasional SLA breach
+-- Adjuster 1: Mike Torres - strong volume, occasional SLA breach
 (1,  1, 38, 342, 9.0,  8.7, 34, 4, 3, 0.05, 'Q1-2026'),
 (2,  1, 35, 350, 10.0, 8.5, 30, 5, 4, 0.06, 'Q4-2025'),
 (3,  1, 30, 330, 11.0, 8.3, 25, 5, 3, 0.07, 'Q3-2025'),
--- Adjuster 2: Sarah Lee — fastest TAT, high quality
+-- Adjuster 2: Sarah Lee - fastest TAT, high quality
 (4,  2, 42, 294, 7.0,  9.2, 40, 2, 2, 0.03, 'Q1-2026'),
 (5,  2, 40, 320, 8.0,  9.0, 37, 3, 2, 0.03, 'Q4-2025'),
 (6,  2, 36, 324, 9.0,  8.9, 33, 3, 2, 0.04, 'Q3-2025'),
--- Adjuster 3: James Park — handles complex high-value claims
+-- Adjuster 3: James Park - handles complex high-value claims
 (7,  3, 22, 440, 20.0, 8.9, 18, 4, 2, 0.04, 'Q1-2026'),
 (8,  3, 20, 460, 23.0, 8.6, 16, 4, 2, 0.05, 'Q4-2025'),
 (9,  3, 18, 468, 26.0, 8.4, 14, 4, 2, 0.06, 'Q3-2025'),
--- Adjuster 4: Lisa Chen — high quality, medium volume
+-- Adjuster 4: Lisa Chen - high quality, medium volume
 (10, 4, 33, 264, 8.0,  9.5, 31, 2, 1, 0.02, 'Q1-2026'),
 (11, 4, 30, 270, 9.0,  9.3, 28, 2, 1, 0.02, 'Q4-2025'),
 (12, 4, 27, 270, 10.0, 9.1, 25, 2, 1, 0.03, 'Q3-2025'),
--- Adjuster 5: Tom Wilson — specialist in minor/quick claims, high volume
+-- Adjuster 5: Tom Wilson - specialist in minor/quick claims, high volume
 (13, 5, 55, 275, 5.0,  8.2, 52, 3, 5, 0.08, 'Q1-2026'),
 (14, 5, 50, 300, 6.0,  8.0, 46, 4, 5, 0.08, 'Q4-2025'),
 (15, 5, 45, 315, 7.0,  7.9, 41, 4, 4, 0.09, 'Q3-2025');
@@ -183,26 +183,26 @@ USE denial_leakage;
 
 -- ── denial_pattern (20 rows) ─────────────────────────────────────────
 INSERT IGNORE INTO denial_pattern (pattern_id, claim_id, denial_code, reason, occurrence_date) VALUES
-(1,  'CLM-2026-AUTO-002', 'D001', 'Policy lapsed at time of incident — no coverage in force',          '2026-01-20'),
-(2,  'CLM-2026-AUTO-003', 'D002', 'Damage pre-existing — not caused by reported incident',             '2026-01-25'),
-(3,  'CLM-2026-PROP-001', 'D003', 'Exclusion applies — gradual water damage not a sudden event',       '2026-02-01'),
-(4,  'CLM-2026-PROP-002', 'D004', 'Arson suspicion — fire origin under investigation',                 '2026-02-05'),
+(1,  'CLM-2026-AUTO-002', 'D001', 'Policy lapsed at time of incident - no coverage in force',          '2026-01-20'),
+(2,  'CLM-2026-AUTO-003', 'D002', 'Damage pre-existing - not caused by reported incident',             '2026-01-25'),
+(3,  'CLM-2026-PROP-001', 'D003', 'Exclusion applies - gradual water damage not a sudden event',       '2026-02-01'),
+(4,  'CLM-2026-PROP-002', 'D004', 'Arson suspicion - fire origin under investigation',                 '2026-02-05'),
 (5,  'CLM-2026-MED-001',  'D005', 'Treatment not medically necessary per clinical review',             '2026-02-10'),
 (6,  'CLM-2026-MED-003',  'D006', 'Procedure not covered under policy schedule of benefits',           '2026-02-20'),
-(7,  'CLM-2026-FC-003',   'D007', 'Liability not established — contributory negligence applies',       '2026-01-25'),
+(7,  'CLM-2026-FC-003',   'D007', 'Liability not established - contributory negligence applies',       '2026-01-25'),
 (8,  'CLM-2026-FC-006',   'D008', 'Product defect claim exceeds single-occurrence policy limit',       '2026-02-15'),
-(9,  'CLM-2026-FC-009',   'D009', 'Employer liability exclusion — employee assumed risk',              '2026-03-05'),
+(9,  'CLM-2026-FC-009',   'D009', 'Employer liability exclusion - employee assumed risk',              '2026-03-05'),
 (10, 'CLM-ENT-001',       'D010', 'Cyber incident not covered under property policy',                  '2026-02-28'),
-(11, 'CLM-2026-AUTO-006', 'D001', 'Policy excess exceeds claim amount — no net payment due',          '2026-02-20'),
+(11, 'CLM-2026-AUTO-006', 'D001', 'Policy excess exceeds claim amount - no net payment due',          '2026-02-20'),
 (12, 'CLM-2026-FC-002',   'D011', 'Injury claim submitted after 90-day limitation period',             '2026-01-28'),
 (13, 'CLM-2026-PROP-003', 'D012', 'Items claimed not listed on home contents schedule',               '2026-02-08'),
 (14, 'CLM-2026-MED-002',  'D005', 'Second surgical opinion conflicts with treating physician',         '2026-02-18'),
 (15, 'CLM-ENT-002',       'D013', 'Scaffold safety regulation non-compliance voids employer cover',    '2026-03-10'),
-(16, 'CLM-2026-AUTO-004', 'D002', 'Vehicle modification undisclosed — cover voided',                  '2026-01-30'),
-(17, 'CLM-2026-FC-004',   'D014', 'Flood zone exclusion applied — policy does not cover floodwater',  '2026-02-01'),
-(18, 'CLM-2026-FC-008',   'D015', 'Third party liability disputed — independent report pending',       '2026-02-18'),
-(19, 'CLM-2026-AUTO-007', 'D016', 'Vandalism claim — CCTV evidence contradicts claimant account',     '2026-02-24'),
-(20, 'CLM-ENT-003',       'D017', 'Cyber event was nation-state attack — war exclusion applies',       '2026-03-12');
+(16, 'CLM-2026-AUTO-004', 'D002', 'Vehicle modification undisclosed - cover voided',                  '2026-01-30'),
+(17, 'CLM-2026-FC-004',   'D014', 'Flood zone exclusion applied - policy does not cover floodwater',  '2026-02-01'),
+(18, 'CLM-2026-FC-008',   'D015', 'Third party liability disputed - independent report pending',       '2026-02-18'),
+(19, 'CLM-2026-AUTO-007', 'D016', 'Vandalism claim - CCTV evidence contradicts claimant account',     '2026-02-24'),
+(20, 'CLM-ENT-003',       'D017', 'Cyber event was nation-state attack - war exclusion applies',       '2026-03-12');
 
 -- ── leakage_flag (18 rows) ───────────────────────────────────────────
 INSERT IGNORE INTO leakage_flag (leakage_id, claim_id, leakage_type, estimated_loss, identified_date) VALUES
@@ -232,7 +232,7 @@ INSERT IGNORE INTO leakage_flag (leakage_id, claim_id, leakage_type, estimated_l
 -- ====================================================================
 USE fraud_risk_db;
 
--- ── risk_score (25 rows — mix of low/medium/high/critical risk) ──────
+-- ── risk_score (25 rows - mix of low/medium/high/critical risk) ──────
 INSERT IGNORE INTO risk_score (score_id, claim_id, score_value, computed_date) VALUES
 (1,  'CLM-2026-AUTO-001', 22.5,  '2026-01-07'),
 (2,  'CLM-2026-AUTO-002', 18.0,  '2026-01-09'),
@@ -292,7 +292,7 @@ INSERT IGNORE INTO risk_indicator (indicator_id, claim_id, indicator_type, sever
 -- ====================================================================
 USE claims_analytics_report_db;
 
--- ── analytics_report (16 rows — all 4 scope types) ──────────────────
+-- ── analytics_report (16 rows - all 4 scope types) ──────────────────
 INSERT IGNORE INTO analytics_report
   (report_id, scope, scope_value, metrics, generated_date, generated_by, report_data)
 VALUES
@@ -382,98 +382,98 @@ INSERT IGNORE INTO users (user_id, name, email, role, is_active) VALUES
 (5, 'Eva Actuary',    'eva.actuary@claiminsight360.com',  'ACTUARY',   true),
 (6, 'Frank Exec',     'frank.exec@claiminsight360.com',   'EXECUTIVE', true);
 
--- ── notifications (30 rows — mix of categories, statuses) ────────────
+-- ── notifications (30 rows - mix of categories, statuses) ────────────
 INSERT IGNORE INTO notifications
   (notification_id, user_id, title, message, category, reference_id, status, created_date, read_date)
 VALUES
 -- RISK alerts
-(1,  1, 'Critical Fraud Risk — CLM-2026-PROP-002',
+(1,  1, 'Critical Fraud Risk - CLM-2026-PROP-002',
      'Claim CLM-2026-PROP-002 has reached a fraud risk score of 88.5. Fire origin remains under investigation. Immediate escalation recommended.',
      'RISK', 'CLM-2026-PROP-002', 'UNREAD', '2026-01-23 11:30:00', NULL),
-(2,  1, 'Critical Fraud Risk — CLM-2026-FC-006',
+(2,  1, 'Critical Fraud Risk - CLM-2026-FC-006',
      'Product liability claim CLM-2026-FC-006 has been flagged CRITICAL (score 95.0). Potential class action exposure detected.',
      'RISK', 'CLM-2026-FC-006', 'UNREAD', '2026-02-04 09:15:00', NULL),
-(3,  4, 'High Risk Flag — CLM-2026-FC-009',
+(3,  4, 'High Risk Flag - CLM-2026-FC-009',
      'Employer liability claim CLM-2026-FC-009 scored 82.0. HighCost and Pattern indicators have been triggered.',
      'RISK', 'CLM-2026-FC-009', 'READ', '2026-02-21 10:00:00', '2026-02-21 14:30:00'),
-(4,  4, 'Critical Risk Score — CLM-ENT-003',
+(4,  4, 'Critical Risk Score - CLM-ENT-003',
      'Cyber incident CLM-ENT-003 has reached the maximum risk score of 97.5. Three simultaneous risk indicators active.',
      'RISK', 'CLM-ENT-003', 'UNREAD', '2026-03-01 08:45:00', NULL),
-(5,  4, 'High Risk — CLM-ENT-001',
+(5,  4, 'High Risk - CLM-ENT-001',
      'Product class action claim CLM-ENT-001 scored 91.0. Legal and Pattern indicators triggered.',
      'RISK', 'CLM-ENT-001', 'ACTIONED', '2026-02-21 09:00:00', '2026-02-22 08:00:00'),
 -- SLA VIOLATION alerts
-(6,  1, 'Critical SLA Violation — Adjuster 3',
+(6,  1, 'Critical SLA Violation - Adjuster 3',
      'Adjuster 3 (James Park) has a CRITICAL SLA violation (SETTLEMENT_BREACH) with 60 days overdue for claim CLM-ENT-001.',
      'PERFORMANCE', 'CLM-ENT-001', 'UNREAD', '2026-05-05 08:00:00', NULL),
-(7,  3, 'SLA Breach Alert — Settlement Delay',
+(7,  3, 'SLA Breach Alert - Settlement Delay',
      'Claim CLM-2026-FC-009 has exceeded the 30-day settlement SLA by 45 days. Escalation to management required.',
      'PERFORMANCE', 'CLM-2026-FC-009', 'READ', '2026-04-06 09:00:00', '2026-04-06 10:15:00'),
-(8,  3, 'SLA Warning — Documentation Delay',
+(8,  3, 'SLA Warning - Documentation Delay',
      'Adjuster 4 (Lisa Chen) has 3 open documentation delays. Average overdue: 7 days.',
      'PERFORMANCE', NULL, 'UNREAD', '2026-02-20 11:00:00', NULL),
-(9,  1, 'SLA Breach — Inspection Overdue',
+(9,  1, 'SLA Breach - Inspection Overdue',
      'Claim CLM-2026-PROP-002 inspection is 11 days overdue. Fire damage assessment has not commenced.',
      'PERFORMANCE', 'CLM-2026-PROP-002', 'READ', '2026-01-29 08:30:00', '2026-01-29 09:45:00'),
-(10, 3, 'Adjuster SLA Summary — Q1 2026',
+(10, 3, 'Adjuster SLA Summary - Q1 2026',
      'Adjuster 1 (Mike Torres): 4 SLA breaches this quarter. Adjuster 3 (James Park): 5 SLA breaches. Review recommended.',
      'PERFORMANCE', NULL, 'READ', '2026-04-02 09:00:00', '2026-04-02 11:00:00'),
 -- DENIAL alerts
-(11, 2, 'Denial Pattern Alert — Medical Claims',
+(11, 2, 'Denial Pattern Alert - Medical Claims',
      'Denial code D005 (treatment not medically necessary) has been applied to 2 medical claims this month. Clinical review protocol may need updating.',
      'DENIAL', NULL, 'UNREAD', '2026-02-22 10:00:00', NULL),
-(12, 2, 'High Denial Rate — Liability Claims',
+(12, 2, 'High Denial Rate - Liability Claims',
      'Liability claims denial rate reached 28% this quarter, up from 18% in Q4-2025. Review denial criteria.',
      'DENIAL', NULL, 'READ', '2026-04-02 08:00:00', '2026-04-02 09:30:00'),
-(13, 3, 'Denial Reversal Request — CLM-2026-FC-009',
+(13, 3, 'Denial Reversal Request - CLM-2026-FC-009',
      'Claimant''s solicitor has filed a formal objection to denial D009 (assumed risk). Legal review requested within 10 business days.',
      'DENIAL', 'CLM-2026-FC-009', 'UNREAD', '2026-03-15 14:00:00', NULL),
 (14, 2, 'Denial Trend Report Available',
      'Monthly denial trend report for March 2026 is ready. Top denial codes: D002 (pre-existing), D005 (not medically necessary), D007 (liability).',
      'DENIAL', NULL, 'DISMISSED', '2026-04-01 08:00:00', NULL),
 -- COST alerts
-(15, 5, 'Reserve Adequacy Warning — CLM-ENT-001',
+(15, 5, 'Reserve Adequacy Warning - CLM-ENT-001',
      'Current reserve of £400,000 for CLM-ENT-001 may be insufficient. Updated legal assessment suggests exposure up to £650,000.',
      'COST', 'CLM-ENT-001', 'UNREAD', '2026-03-10 09:00:00', NULL),
 (16, 5, 'Total Reserve Threshold Exceeded',
      'Portfolio total reserve has exceeded £1.2M for the first time this year. Actuarial review of IBNR reserves recommended.',
      'COST', NULL, 'READ', '2026-03-12 10:00:00', '2026-03-12 14:00:00'),
-(17, 3, 'High Cost Claim — CLM-2026-PROP-002',
+(17, 3, 'High Cost Claim - CLM-2026-PROP-002',
      'Property claim CLM-2026-PROP-002 costs have reached £45,000. Contractor quotes variance of 18% requires second assessment.',
      'COST', 'CLM-2026-PROP-002', 'READ', '2026-02-10 08:30:00', '2026-02-10 09:00:00'),
-(18, 5, 'Leakage Detection — Overpayment Identified',
+(18, 5, 'Leakage Detection - Overpayment Identified',
      'Financial audit identified £45,000 overpayment on CLM-ENT-001. Recovery process to be initiated.',
      'COST', 'CLM-ENT-001', 'UNREAD', '2026-03-06 11:00:00', NULL),
 -- AGING alerts
-(19, 2, 'Aging Alert — 5 Claims Over 90 Days',
+(19, 2, 'Aging Alert - 5 Claims Over 90 Days',
      'Claims CLM-2026-FC-006, CLM-2026-FC-009, CLM-ENT-001, CLM-ENT-002, CLM-ENT-003 have exceeded 90 days without resolution.',
      'AGING', NULL, 'UNREAD', '2026-04-05 08:00:00', NULL),
-(20, 2, 'Aging Warning — CLM-2026-PROP-002',
+(20, 2, 'Aging Warning - CLM-2026-PROP-002',
      'Property fire claim CLM-2026-PROP-002 has been open for 78 days. Target closure is 90 days.',
      'AGING', 'CLM-2026-PROP-002', 'READ', '2026-04-10 09:00:00', '2026-04-10 10:30:00'),
-(21, 3, 'Aging Report — Q1 2026 Summary',
+(21, 3, 'Aging Report - Q1 2026 Summary',
      '5 claims in BUCKET_90_PLUS representing £985,000 total reserve. Average age: 112 days. Immediate management action required.',
      'AGING', NULL, 'UNREAD', '2026-04-01 09:00:00', NULL),
 -- SYSTEM alerts
-(22, 1, 'Data Feed Failure — LegacyClaims v1',
+(22, 1, 'Data Feed Failure - LegacyClaims v1',
      'Data feed from LegacyClaims v1 (Feed ID: 9) has been in FAILED status since 2024-07-01. IT team notified.',
      'SYSTEM', '9', 'READ', '2026-01-15 08:00:00', '2026-01-15 09:00:00'),
-(23, 1, 'Scheduled Maintenance — 2026-04-20 02:00',
+(23, 1, 'Scheduled Maintenance - 2026-04-20 02:00',
      'The ClaimInsight360 platform will be unavailable for maintenance on 20 April 2026 from 02:00 to 04:00 UTC.',
      'SYSTEM', NULL, 'UNREAD', '2026-04-13 10:00:00', NULL),
-(24, 1, 'New User Registered — bob_analyst',
+(24, 1, 'New User Registered - bob_analyst',
      'New user bob_analyst (CLAIMS_ANALYST role) has registered on the platform.',
      'SYSTEM', NULL, 'READ', '2026-01-20 09:00:00', '2026-01-20 09:15:00'),
-(25, 1, 'Eureka Service Down — analytics-report-service',
+(25, 1, 'Eureka Service Down - analytics-report-service',
      'analytics-report-service has not sent a heartbeat for 5 minutes. Auto-restart attempted.',
      'SYSTEM', NULL, 'ACTIONED', '2026-02-28 03:15:00', '2026-02-28 07:00:00'),
-(26, 4, 'Fraud Model Retrained — New Threshold Applied',
+(26, 4, 'Fraud Model Retrained - New Threshold Applied',
      'The fraud risk scoring model was retrained on 2026-03-01 with Q4-2025 + Q1-2026 data. High-risk threshold remains at 75.',
      'SYSTEM', NULL, 'READ', '2026-03-01 09:00:00', '2026-03-01 10:00:00'),
-(27, 1, 'Critical SLA Violation — Adjuster 1',
+(27, 1, 'Critical SLA Violation - Adjuster 1',
      'Adjuster 1 (Mike Torres) has a CRITICAL SLA violation (INSPECTION_DELAY) with 11 days overdue for claim CLM-2026-PROP-002.',
      'PERFORMANCE', 'CLM-2026-PROP-002', 'READ', '2026-01-29 08:35:00', '2026-01-29 11:00:00'),
-(28, 2, 'Denial Pattern — Policy Exclusion Spike',
+(28, 2, 'Denial Pattern - Policy Exclusion Spike',
      'Denial code D014 (flood zone exclusion) applied to 3 claims in January 2026. Product team alerted to review exclusion wording.',
      'DENIAL', NULL, 'UNREAD', '2026-02-03 10:00:00', NULL),
 (29, 5, 'IBNR Reserve Adjustment Required',

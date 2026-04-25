@@ -6,11 +6,16 @@ spring:
     url: jdbc:mysql://localhost:3306/NotificationsDB?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: root
     password: root
+  sql:
+    init:
+      mode: always
+      data-locations: classpath:data.sql
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
       ddl-auto: update
     show-sql: true
+    defer-datasource-initialization: true
   messages:
     basename: error
   banner:

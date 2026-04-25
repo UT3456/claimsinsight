@@ -1,5 +1,4 @@
 package com.demo.repositorytesting;
-import com.demo.entities.Claim;
 import com.demo.entities.SLAViolation;
 import com.demo.repositories.SLAViolationRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -16,10 +15,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Repository Tests for SLAViolationRepository
+ * Repository Tests for SLAViolationRepository.
+ *
+ * <p>{@code claimId} is a soft reference (plain {@code Long}) — the {@code claim}
+ * table is owned by claims-metrics-service, so we just store the id with no FK.</p>
  */
 @DataJpaTest
 public class SLAViolationRepositoryTests {
+
+    private static final Long CLAIM_ID = 500L;
 
     @Autowired
     private SLAViolationRepository repository;
@@ -28,20 +32,9 @@ public class SLAViolationRepositoryTests {
     private TestEntityManager entityManager;
 
     private SLAViolation v1, v2, v3, v4;
-    private Claim claim1;
 
     @BeforeEach
     void setUp() {
-        // Persist mock Claim (owned by another module — FK reference only)
-        claim1 = new Claim();
-        claim1.setPolicyId(100L);
-        claim1.setCustomerId(200L);
-        claim1.setClaimType("Health");
-        claim1.setClaimStatus("Open");
-        claim1.setReportedDate(new Date());
-        claim1.setAmount(5000.0);
-        entityManager.persist(claim1);
-
         // v1 — LOW severity (daysOverdue=2)
         v1 = new SLAViolation();
         v1.setAdjusterId(101L);
@@ -49,7 +42,7 @@ public class SLAViolationRepositoryTests {
         v1.setSlaTargetDays(10);
         v1.setActualDays(12);         // daysOverdue = 2
         v1.setViolationDate(new Date());
-        v1.setClaim(claim1);
+        v1.setClaimId(CLAIM_ID);
 
         // v2 — MEDIUM severity (daysOverdue=5)
         v2 = new SLAViolation();
@@ -58,14 +51,14 @@ public class SLAViolationRepositoryTests {
         v2.setSlaTargetDays(5);
         v2.setActualDays(10);
         v2.setViolationDate(new Date());
-        v2.setClaim(claim1);
+        v2.setClaimId(CLAIM_ID);
 
         v3 = new SLAViolation();
         v3.setAdjusterId(102L);
         v3.setViolationType("DECISION_DELAY");
         v3.setSlaTargetDays(7);
         v3.setViolationDate(new Date());
-        v3.setClaim(claim1);
+        v3.setClaimId(CLAIM_ID);
 
         v4 = new SLAViolation();
         v4.setAdjusterId(102L);
@@ -73,7 +66,7 @@ public class SLAViolationRepositoryTests {
         v4.setSlaTargetDays(3);
         v4.setActualDays(20);
         v4.setViolationDate(new Date());
-        v4.setClaim(claim1);
+        v4.setClaimId(CLAIM_ID);
 
         repository.save(v1);
         repository.save(v2);
@@ -113,17 +106,17 @@ public class SLAViolationRepositoryTests {
         assertThat(result).isEmpty();
     }
 
-    // ── findByClaim_ClaimId ───────────────────────────────────────────────
+    // ── findByClaimId ─────────────────────────────────────────────────────
 
     @Test
     void testFindByClaimId_positive() {
-        List<SLAViolation> result = repository.findByClaim_ClaimId(claim1.getClaimId());
+        List<SLAViolation> result = repository.findByClaimId(CLAIM_ID);
         assertThat(result).hasSize(4);
     }
 
     @Test
     void testFindByClaimId_negative() {
-        List<SLAViolation> result = repository.findByClaim_ClaimId(999L);
+        List<SLAViolation> result = repository.findByClaimId(999L);
         assertThat(result).isEmpty();
     }
 
@@ -212,7 +205,7 @@ public class SLAViolationRepositoryTests {
 
     @Test
     void testFindTotalDaysOverdueByClaim_positive() {
-        Integer total = repository.findTotalDaysOverdueByClaim(claim1.getClaimId());
+        Integer total = repository.findTotalDaysOverdueByClaim(CLAIM_ID);
         assertEquals(17, total);
     }
 
@@ -264,7 +257,7 @@ public class SLAViolationRepositoryTests {
         newV.setSlaTargetDays(5);
         newV.setActualDays(9);
         newV.setViolationDate(new Date());
-        newV.setClaim(claim1);
+        newV.setClaimId(CLAIM_ID);
         SLAViolation saved = repository.save(newV);
         assertNotNull(saved.getViolationId());
     }

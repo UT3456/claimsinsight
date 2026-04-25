@@ -30,4 +30,14 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     int markAllAsRead(@Param("userId") Long userId, @Param("now") LocalDateTime now);
 
     boolean existsByReferenceIdAndCategoryAndStatus(String referenceId, NotificationCategory category, NotificationStatus status);
+
+    /**
+     * Per-user dedup used by the scheduler fan-outs. We deliberately scope this
+     * to a single userId (unlike {@link #existsByReferenceIdAndCategoryAndStatus})
+     * so that when new users join after a scheduler run has already fired for a
+     * claim, they still get their own copy of the alert — otherwise late joiners
+     * are silently excluded until the existing UNREAD is read/dismissed.
+     */
+    boolean existsByUserIdAndReferenceIdAndCategoryAndStatus(
+            Long userId, String referenceId, NotificationCategory category, NotificationStatus status);
 }

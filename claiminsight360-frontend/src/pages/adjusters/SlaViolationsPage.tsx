@@ -7,6 +7,11 @@ import { PlusOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { slaApi, SlaViolation, CreateSlaViolationRequest } from '../../api/adjustersApi';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend, CartesianGrid,
+} from 'recharts';
+import ChartCard, { CHART_COLORS, CHART_PALETTE } from '../../components/charts/ChartCard';
 
 const { Title, Text } = Typography;
 
@@ -89,6 +94,22 @@ export default function SlaViolationsPage() {
   const medium = state.items.filter(i => i.severity === 'MEDIUM').length;
   const escalated = state.items.filter(i => i.escalated).length;
 
+  // ── Chart data ────────────────────────────────────────────────────────────
+  const byType = Object.entries(
+    state.items.reduce<Record<string, number>>((acc, v) => {
+      acc[v.violationType] = (acc[v.violationType] ?? 0) + 1;
+      return acc;
+    }, {}),
+  )
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+
+  const severityMix = [
+    { name: 'HIGH',   value: high,   color: CHART_COLORS.danger },
+    { name: 'MEDIUM', value: medium, color: CHART_COLORS.accent2 },
+    { name: 'LOW',    value: state.items.filter(i => i.severity === 'LOW').length, color: CHART_COLORS.warn },
+  ].filter(s => s.value > 0);
+
   const columns: ColumnsType<SlaViolation> = [
     { title: 'ID',            dataIndex: 'violationId',   key: 'violationId',  width: 80 },
     { title: 'Claim ID',      dataIndex: 'claimId',       key: 'claimId',      render: v => <Text code>{v}</Text> },
@@ -140,6 +161,50 @@ export default function SlaViolationsPage() {
       </Row>
 
       {state.error && <Alert type="error" message={state.error} style={{ marginBottom: 16 }} />}
+
+      {/* Charts */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col xs={24} lg={14}>
+          <ChartCard
+            title="Violations by Type"
+            subtitle="Frequency of each SLA breach category"
+            loading={state.loading}
+            isEmpty={!state.loading && byType.length === 0}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={byType} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--ci-border)" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} />
+                <RTooltip contentStyle={{ background: 'var(--ci-bg-surface)', border: '1px solid var(--ci-border)', borderRadius: 8 }} />
+                <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                  {byType.map((_, i) => <Cell key={i} fill={CHART_PALETTE[i % CHART_PALETTE.length]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Col>
+
+        <Col xs={24} lg={10}>
+          <ChartCard
+            title="Severity Mix"
+            subtitle="Distribution across HIGH / MEDIUM / LOW"
+            loading={state.loading}
+            isEmpty={!state.loading && severityMix.length === 0}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={severityMix} dataKey="value" nameKey="name"
+                  cx="50%" cy="50%" innerRadius={55} outerRadius={95} paddingAngle={2}>
+                  {severityMix.map((s, i) => <Cell key={i} fill={s.color} />)}
+                </Pie>
+                <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                <RTooltip contentStyle={{ background: 'var(--ci-bg-surface)', border: '1px solid var(--ci-border)', borderRadius: 8 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Col>
+      </Row>
 
       <Table
         rowKey="violationId"

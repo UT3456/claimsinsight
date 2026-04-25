@@ -1,7 +1,7 @@
 package com.claims.service;
 
 import com.claims.client.NotificationServiceClient;
-import com.claims.client.dto.NotificationRequestDTO;
+import com.claims.client.dto.NotificationDispatchRequestDTO;
 import com.claims.dto.request.AgingRecordRequest;
 import com.claims.dto.response.AgingRecordResponse;
 import com.claims.enums.AgingBucket;
@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,15 +27,16 @@ public class AgingRecordServiceImpl implements AgingRecordService {
 
     private final AgingRecordRepository agingRecordRepository;
     private final ModelMapper modelMapper;
-    private final NotificationServiceClient notificationServiceClient;
+
+    /** Optional: null when NotificationService is unreachable. Notifications are non-blocking. */
+    @Autowired(required = false)
+    private NotificationServiceClient notificationServiceClient;
 
     @Autowired
     public AgingRecordServiceImpl(AgingRecordRepository agingRecordRepository,
-                                  ModelMapper modelMapper,
-                                  NotificationServiceClient notificationServiceClient) {
+                                  ModelMapper modelMapper) {
         this.agingRecordRepository = agingRecordRepository;
         this.modelMapper = modelMapper;
-        this.notificationServiceClient = notificationServiceClient;
     }
 
 
@@ -54,18 +56,25 @@ public class AgingRecordServiceImpl implements AgingRecordService {
     }
 
     private void sendCriticalAgingNotification(AgingRecord record) {
+        if (notificationServiceClient == null) {
+            log.debug("NotificationService unavailable — skipping aging alert for claim {}", record.getClaimId());
+            return;
+        }
         try {
-            NotificationRequestDTO notification = NotificationRequestDTO.builder()
-                    .userId(1L)
+            // Dispatch to every ANALYST (owns the claim) + MANAGER (escalation point)
+            // instead of hardcoding userId=1L.
+            NotificationDispatchRequestDTO notification = NotificationDispatchRequestDTO.builder()
+                    .targetRoles(Set.of("ANALYST", "MANAGER"))
                     .title("Critical Aging Alert - Claim " + record.getClaimId())
                     .message("Claim " + record.getClaimId() + " has been aging for "
                             + record.getAgingDays() + " days and is in the BUCKET_90_PLUS category. Immediate action required.")
                     .category("AGING")
                     .referenceId(record.getClaimId())
                     .build();
-            notificationServiceClient.createNotification(notification);
+            notificationServiceClient.dispatchNotification(notification);
+            log.info("Dispatched AGING notification for claim {}", record.getClaimId());
         } catch (Exception e) {
-            log.warn("Failed to send critical aging notification for claim {}: {}", record.getClaimId(), e.getMessage());
+            log.warn("Failed to dispatch critical aging notification for claim {}: {}", record.getClaimId(), e.getMessage());
         }
     }
 
@@ -86,9 +95,17 @@ public class AgingRecordServiceImpl implements AgingRecordService {
     @Override
     public AgingRecordResponse updateAgingRecord(Long agingId, AgingRecordRequest request) {
         AgingRecord existing = findAgingByIdOrThrow(agingId);
+        AgingBucket previousBucket = existing.getAgingBucket();
         modelMapper.map(request, existing);
         existing.setAgingBucket(deriveBucket(request.getAgingDays()));
         AgingRecord updated = agingRecordRepository.save(existing);
+
+        // Only fire when the claim *transitions into* the critical bucket — avoids spam on every update
+        if (updated.getAgingBucket() == AgingBucket.BUCKET_90_PLUS
+                && previousBucket != AgingBucket.BUCKET_90_PLUS) {
+            sendCriticalAgingNotification(updated);
+        }
+
         return modelMapper.map(updated, AgingRecordResponse.class);
     }
 

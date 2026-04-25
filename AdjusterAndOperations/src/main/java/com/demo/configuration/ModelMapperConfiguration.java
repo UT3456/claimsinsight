@@ -1,7 +1,5 @@
 package com.demo.configuration;
 
-import com.demo.dto.SLAViolationDTO;
-import com.demo.entities.SLAViolation;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.convention.MatchingStrategies;
 import org.springframework.context.annotation.Bean;
@@ -9,6 +7,11 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Configuration class for ModelMapper.
+ *
+ * <p>With STRICT matching, SLAViolation.claimId → SLAViolationDTO.claimId maps
+ * automatically by name now that SLAViolation holds a plain {@code Long claimId}
+ * instead of a JPA {@code @ManyToOne Claim} relationship. No explicit typeMap
+ * override is required.</p>
  */
 @Configuration
 public class ModelMapperConfiguration {
@@ -19,12 +22,6 @@ public class ModelMapperConfiguration {
 
         modelMapper.getConfiguration()
                 .setMatchingStrategy(MatchingStrategies.STRICT);
-
-        modelMapper.typeMap(SLAViolation.class, SLAViolationDTO.class)
-                .addMappings(mapper -> mapper.map(
-                        src -> src.getClaim().getClaimId(),
-                        SLAViolationDTO::setClaimId
-                ));
 
         return modelMapper;
     }

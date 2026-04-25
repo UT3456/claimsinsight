@@ -7,6 +7,7 @@ import {
   UserOutlined, SafetyCertificateOutlined,
   ClockCircleOutlined, KeyOutlined,
 } from '@ant-design/icons';
+import { FiCheckCircle, FiLock } from 'react-icons/fi';
 import { useAuth } from '../../hooks/useAuth';
 import { notificationsApi } from '../../api/notificationsApi';
 import { ROLE_LABELS, ROLE_COLORS, type AppRole } from '../../utils/roles';
@@ -182,9 +183,9 @@ export default function ProfilePage() {
                 const hasAccess = role ? roles.includes(role) : false;
                 return (
                   <Col xs={24} sm={12} key={label}>
-                    <div style={{ ...styles.permRow, background: hasAccess ? '#f0fdf4' : '#fef2f2', border: `1px solid ${hasAccess ? '#bbf7d0' : '#fecaca'}` }}>
-                      <Text style={{ fontSize: 13, color: hasAccess ? '#16a34a' : '#dc2626' }}>
-                        {hasAccess ? '✅' : '🔒'} {label}
+                    <div style={{ ...styles.permRow, background: hasAccess ? 'rgba(60,179,113,0.08)' : 'rgba(244,91,105,0.08)', border: `1px solid ${hasAccess ? 'rgba(60,179,113,0.35)' : 'rgba(244,91,105,0.35)'}` }}>
+                      <Text style={{ fontSize: 13, color: hasAccess ? '#3CB371' : '#F45B69', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                        {hasAccess ? <FiCheckCircle /> : <FiLock />} {label}
                       </Text>
                     </div>
                   </Col>

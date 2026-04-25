@@ -1,7 +1,9 @@
 package com.claim360.denialleakage.service;
 
 import com.claim360.denialleakage.client.FraudRiskServiceClient;
+import com.claim360.denialleakage.client.NotificationServiceClient;
 import com.claim360.denialleakage.client.dto.FraudRiskScoreDTO;
+import com.claim360.denialleakage.client.dto.NotificationRequestDTO;
 import com.claim360.denialleakage.dto.LeakageFlagRequest;
 import com.claim360.denialleakage.dto.LeakageFlagResponse;
 import com.claim360.denialleakage.entity.LeakageFlag;
@@ -31,9 +33,16 @@ public class LeakageFlagServiceImpl implements LeakageFlagService {
     private final LeakageFlagRepository leakageFlagRepository;
     private final ModelMapper modelMapper;
 
+    /** Large-loss threshold for leakage alerts. */
+    private static final double LARGE_LOSS_THRESHOLD = 10_000.0;
+
     /** Optional: null when fraud-risk-service is unreachable. Cross-reference is non-blocking. */
     @Autowired(required = false)
     private FraudRiskServiceClient fraudRiskServiceClient;
+
+    /** Optional: null when NotificationService is unreachable. Notifications are non-blocking. */
+    @Autowired(required = false)
+    private NotificationServiceClient notificationServiceClient;
 
     @Override
     public LeakageFlagResponse createLeakageFlag(LeakageFlagRequest request) {
@@ -59,7 +68,30 @@ public class LeakageFlagServiceImpl implements LeakageFlagService {
         LeakageFlag flag = modelMapper.map(request, LeakageFlag.class);
         LeakageFlag saved = leakageFlagRepository.save(flag);
         log.info("LeakageFlag created with ID: {}", saved.getLeakageId());
+
+        if (saved.getEstimatedLoss() != null && saved.getEstimatedLoss() >= LARGE_LOSS_THRESHOLD) {
+            sendLeakageNotification(saved);
+        }
+
         return modelMapper.map(saved, LeakageFlagResponse.class);
+    }
+
+    private void sendLeakageNotification(LeakageFlag flag) {
+        if (notificationServiceClient == null) return;
+        try {
+            NotificationRequestDTO notification = NotificationRequestDTO.builder()
+                    .userId(1L) // TODO: fan out to leakage-owning users via user-service
+                    .title("High-Value Leakage Flag - Claim " + flag.getClaimId())
+                    .message("Claim " + flag.getClaimId() + " flagged for " + flag.getLeakageType()
+                            + " leakage. Estimated loss: $" + flag.getEstimatedLoss() + ". Requires investigation.")
+                    .category("DENIAL")
+                    .referenceId(flag.getClaimId())
+                    .build();
+            notificationServiceClient.createNotification(notification);
+            log.info("Sent leakage notification for claim {}", flag.getClaimId());
+        } catch (Exception e) {
+            log.warn("Failed to send leakage notification for claim {}: {}", flag.getClaimId(), e.getMessage());
+        }
     }
 
     @Override

@@ -27,7 +27,7 @@ const styles: Record<string, React.CSSProperties> = {
   shell: {
     display: 'flex',
     minHeight: '100vh',
-    background: '#f8fafc',
+    background: 'var(--ci-bg-app)',
   },
   main: {
     flex: 1,

@@ -17,7 +17,7 @@ public interface SLAViolationRepository extends JpaRepository<SLAViolation, Long
 
     List<SLAViolation> findByAdjusterIdAndViolationDateBetween(Long adjusterId, Date start, Date end);
 
-    List<SLAViolation> findByClaim_ClaimId(Long claimId);
+    List<SLAViolation> findByClaimId(Long claimId);
 
     List<SLAViolation> findByViolationType(String violationType);
 
@@ -43,7 +43,7 @@ public interface SLAViolationRepository extends JpaRepository<SLAViolation, Long
     Long countViolationsByAdjusterAndPeriod(@Param("adjusterId") Long adjusterId, @Param("start") Date start, @Param("end") Date end);
 
     @Query("SELECT COALESCE(SUM(s.actualDays - s.slaTargetDays), 0) " +
-            "FROM SLAViolation s WHERE s.claim.claimId = :claimId")
+            "FROM SLAViolation s WHERE s.claimId = :claimId")
     Integer findTotalDaysOverdueByClaim(@Param("claimId") Long claimId);
 
     @Query("SELECT COUNT(s) FROM SLAViolation s WHERE s.adjusterId = :adjusterId")

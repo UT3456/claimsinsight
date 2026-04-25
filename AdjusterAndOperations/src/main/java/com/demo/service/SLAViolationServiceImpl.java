@@ -1,9 +1,8 @@
 package com.demo.service;
 
 import com.demo.client.NotificationServiceClient;
-import com.demo.client.dto.NotificationRequestDTO;
+import com.demo.client.dto.NotificationDispatchRequestDTO;
 import com.demo.dto.SLAViolationDTO;
-import com.demo.entities.Claim;
 import com.demo.entities.SLAViolation;
 import com.demo.exception.DatabaseOperationException;
 import com.demo.exception.InvalidInputException;
@@ -20,6 +19,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Service Implementation for tracking and analyzing Service Level Agreement (SLA) Violations.
@@ -57,12 +57,7 @@ public class SLAViolationServiceImpl implements SLAViolationService {
             entity.setSlaTargetDays(dto.getSlaTargetDays());
             entity.setActualDays(dto.getActualDays());
             entity.setViolationDate(dto.getViolationDate());
-
-            if (dto.getClaimId() != null) {
-                Claim claimRef = new Claim();
-                claimRef.setClaimId(dto.getClaimId());
-                entity.setClaim(claimRef);
-            }
+            entity.setClaimId(dto.getClaimId());
 
             SLAViolation saved = repository.save(entity);
             SLAViolationDTO result = computeAndEnrich(saved);
@@ -81,8 +76,10 @@ public class SLAViolationServiceImpl implements SLAViolationService {
 
     private void sendCriticalViolationNotification(SLAViolationDTO dto) {
         try {
-            NotificationRequestDTO notification = NotificationRequestDTO.builder()
-                    .userId(1L)
+            // Dispatch to every MANAGER + EXECUTIVE so the right ops people see
+            // a CRITICAL breach — not a single hardcoded system user.
+            NotificationDispatchRequestDTO notification = NotificationDispatchRequestDTO.builder()
+                    .targetRoles(Set.of("MANAGER", "EXECUTIVE"))
                     .title("Critical SLA Violation - Adjuster " + dto.getAdjusterId())
                     .message("Adjuster " + dto.getAdjusterId() + " has a CRITICAL SLA violation ("
                             + dto.getViolationType() + ") with " + dto.getDaysOverdue()
@@ -90,7 +87,7 @@ public class SLAViolationServiceImpl implements SLAViolationService {
                     .category("PERFORMANCE")
                     .referenceId(dto.getClaimId() != null ? String.valueOf(dto.getClaimId()) : null)
                     .build();
-            notificationServiceClient.createNotification(notification);
+            notificationServiceClient.dispatchNotification(notification);
         } catch (Exception e) {
             log.warn("Failed to send critical SLA violation notification for adjuster {}: {}",
                     dto.getAdjusterId(), e.getMessage());
@@ -134,7 +131,7 @@ public class SLAViolationServiceImpl implements SLAViolationService {
     public List<SLAViolationDTO> getSLAViolationsByClaim(Long claimId) {
         try {
             if (claimId == null) throw new InvalidInputException("Claim ID is required.");
-            List<SLAViolation> list = repository.findByClaim_ClaimId(claimId);
+            List<SLAViolation> list = repository.findByClaimId(claimId);
             return mapAndEnrichList(list, "claim ID: " + claimId);
         } catch (Exception e) {
             return handleFetchException(e);
@@ -233,12 +230,7 @@ public class SLAViolationServiceImpl implements SLAViolationService {
             existing.setActualDays(dto.getActualDays());
             existing.setViolationDate(dto.getViolationDate());
             existing.setAdjusterId(dto.getAdjusterId());
-
-            if (dto.getClaimId() != null) {
-                Claim claimRef = new Claim();
-                claimRef.setClaimId(dto.getClaimId());
-                existing.setClaim(claimRef);
-            }
+            existing.setClaimId(dto.getClaimId());
 
             SLAViolation updated = repository.save(existing);
             return computeAndEnrich(updated);
@@ -273,10 +265,6 @@ public class SLAViolationServiceImpl implements SLAViolationService {
 
     private SLAViolationDTO computeAndEnrich(SLAViolation entity) {
         SLAViolationDTO dto = modelMapper.map(entity, SLAViolationDTO.class);
-
-        if (entity.getClaim() != null) {
-            dto.setClaimId(entity.getClaim().getClaimId());
-        }
 
         int daysOverdue = entity.getActualDays() - entity.getSlaTargetDays();
         dto.setDaysOverdue(daysOverdue);

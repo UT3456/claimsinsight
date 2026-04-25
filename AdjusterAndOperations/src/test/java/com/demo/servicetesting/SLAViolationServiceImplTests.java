@@ -1,6 +1,5 @@
 package com.demo.servicetesting;
 import com.demo.dto.SLAViolationDTO;
-import com.demo.entities.Claim;
 import com.demo.entities.SLAViolation;
 import com.demo.exception.DatabaseOperationException;
 import com.demo.exception.InvalidInputException;
@@ -41,12 +40,9 @@ public class SLAViolationServiceImplTests {
 
     @BeforeEach
     void setUp() {
-        Claim mockClaim = new Claim();
-        mockClaim.setClaimId(10L);
-
         entity = new SLAViolation();
         entity.setViolationId(1L);
-        entity.setClaim(mockClaim);
+        entity.setClaimId(10L);
         entity.setAdjusterId(101L);
         entity.setViolationType("PAYMENT_DELAY");
         entity.setSlaTargetDays(10);

@@ -64,3 +64,5 @@ Thumbs.db
 
 # Claude
 .claude/
+route/PROMPT_SIMPLE.md
+new design/PROMPT_SIMPLE.md

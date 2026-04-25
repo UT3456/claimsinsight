@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ClaimInsight360 — Role-Based Reference</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; color: #333; font-size: 13px; background: #f5f5f5; padding: 20px; }
+.container { max-width: 900px; margin: 0 auto; }
+.intro { background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 14px 18px; margin-bottom: 16px; }
+.intro h1 { font-size: 18px; margin-bottom: 4px; }
+.intro p { font-size: 12px; color: #666; }
+.label { font-size: 11px; color: #999; margin: 20px 0 6px; letter-spacing: 0.5px; }
+.screen { background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 18px; margin-bottom: 14px; }
+.screen.flush { padding: 0; }
+.screen h2 { font-size: 16px; margin-bottom: 4px; color: #222; }
+.screen h3 { font-size: 13px; margin-bottom: 8px; color: #333; margin-top: 8px; }
+.sub { font-size: 12px; color: #888; margin-bottom: 14px; }
+.row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; flex-wrap: wrap; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
+.stat { background: #f7f7f7; border: 1px solid #eee; padding: 9px 11px; border-radius: 4px; }
+.stat-lbl { font-size: 11px; color: #666; }
+.stat-val { font-size: 18px; font-weight: bold; margin-top: 2px; color: #222; }
+.stat-sub { font-size: 10px; color: #888; margin-top: 2px; }
+.btn { padding: 5px 11px; border: 1px solid #ccc; background: #fff; border-radius: 4px; font-size: 12px; color: #333; display: inline-block; cursor: pointer; }
+.btn-primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+.btn-danger { background: #dc2626; color: #fff; border-color: #dc2626; }
+.input { width: 100%; padding: 7px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; background: #fff; color: #333; }
+label { display: block; font-size: 12px; color: #555; margin-bottom: 4px; margin-top: 10px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { background: #f7f7f7; padding: 7px 8px; text-align: left; border-bottom: 1px solid #ddd; font-weight: 600; font-size: 11px; color: #555; }
+td { padding: 7px 8px; border-bottom: 1px solid #eee; color: #333; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; }
+.tag-green { background: #dcfce7; color: #166534; }
+.tag-red { background: #fee2e2; color: #991b1b; }
+.tag-yellow { background: #fef3c7; color: #854d0e; }
+.tag-blue { background: #dbeafe; color: #1e40af; }
+.card { background: #fff; border: 1px solid #e5e5e5; border-radius: 4px; padding: 11px; }
+.card-title { font-size: 12px; font-weight: 600; margin-bottom: 10px; color: #333; }
+.layout { display: grid; grid-template-columns: 160px 1fr; min-height: 380px; }
+.sidebar { background: #f7f7f7; padding: 12px 8px; border-right: 1px solid #e5e5e5; }
+.brand { font-size: 12px; font-weight: 600; padding: 0 10px 12px; border-bottom: 1px solid #e5e5e5; margin-bottom: 10px; color: #222; }
+.brand small { display: block; font-weight: 400; color: #888; font-size: 10px; margin-top: 2px; }
+.nav-title { font-size: 10px; color: #999; padding: 6px 10px 4px; letter-spacing: 0.5px; }
+.nav-item { padding: 6px 10px; font-size: 12px; color: #555; border-radius: 3px; margin-bottom: 1px; cursor: pointer; }
+.nav-item.active { background: #2563eb; color: #fff; }
+.user-tag { margin-top: 10px; padding: 8px 10px; background: #fff; border: 1px solid #e5e5e5; border-radius: 4px; font-size: 11px; }
+.user-tag b { display: block; margin-bottom: 2px; }
+.user-tag .role { color: #2563eb; font-size: 10px; }
+.main { padding: 14px 16px; background: #fff; }
+.alert { padding: 8px 10px; border-radius: 4px; font-size: 12px; margin-bottom: 10px; }
+.alert-red { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+.alert-green { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+.bar-wrap { margin-bottom: 7px; }
+.bar-head { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px; }
+.bar { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; background: #2563eb; }
+.auth { max-width: 340px; margin: 20px auto; }
+.divider { height: 1px; background: #eee; margin: 16px 0; }
+.text-center { text-align: center; }
+.muted { color: #888; font-size: 12px; }
+.link { color: #2563eb; cursor: pointer; }
+.notif { display: flex; gap: 10px; padding: 10px; border-bottom: 1px solid #eee; align-items: flex-start; }
+.notif-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+.delta-up { color: #16a34a; font-size: 10px; }
+.delta-down { color: #dc2626; font-size: 10px; }
+.legend-item { font-size: 12px; margin-bottom: 4px; }
+.legend-box { display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: middle; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="intro">
+<h1>ClaimInsight360 Reference</h1>
+<p>All screens for 6 user roles. Dashboard and menu change based on the logged-in user role. All other screens (denials, reports, notifications, etc.) are shared but filtered/scoped per role permissions.</p>
+</div>
+
+<div class="label">AUTH · 01 · LOGIN</div>
+<div class="screen">
+<div class="auth">
+<h2 class="text-center">ClaimInsight360</h2>
+<p class="sub text-center">Sign in to your account</p>
+<label>Email</label><input class="input" type="email" placeholder="you@company.com">
+<label>Password</label><input class="input" type="password" placeholder="password">
+<div style="margin:12px 0;"><input type="checkbox" checked> <span style="font-size:12px;">Remember me</span></div>
+<button class="btn btn-primary" style="width:100%;padding:8px;">Sign in</button>
+<p class="text-center muted" style="margin-top:12px;"><a class="link">Forgot password?</a></p>
+<div class="divider"></div>
+<p class="text-center muted">New here? <a class="link">Create account</a></p>
+</div>
+</div>
+
+<div class="label">AUTH · 02 · REGISTER</div>
+<div class="screen">
+<div class="auth">
+<h2 class="text-center">Create account</h2>
+<p class="sub text-center">Get started with ClaimInsight360</p>
+<label>Full name</label><input class="input" type="text">
+<label>Email</label><input class="input" type="email">
+<label>Password</label><input class="input" type="password">
+<label>Role</label><select class="input"><option>Claims Analyst</option><option>Claims Manager</option><option>Fraud Analyst</option><option>Actuary</option><option>Operations Executive</option><option>Admin</option></select>
+<div style="margin:12px 0;"><input type="checkbox"> <span style="font-size:12px;">I agree to terms and conditions</span></div>
+<button class="btn btn-primary" style="width:100%;padding:8px;">Register</button>
+<p class="text-center muted" style="margin-top:12px;">Already have an account? <a class="link">Sign in</a></p>
+</div>
+</div>
+
+<div class="label">ROLE 1 · CLAIMS ANALYST DASHBOARD</div>
+<div class="screen flush"><div class="layout">
+<aside class="sidebar">
+<div class="brand">ClaimInsight360<small>Analyst workspace</small></div>
+<div class="nav-title">WORK</div>
+<div class="nav-item active">My dashboard</div>
+<div class="nav-item">My queue</div>
+<div class="nav-item">All claims</div>
+<div class="nav-title">ANALYSIS</div>
+<div class="nav-item">Denials</div>
+<div class="nav-item">Cost drivers</div>
+<div class="nav-item">Notifications</div>
+<div class="user-tag"><b>Omar Hassan</b><span class="role">Claims Analyst</span></div>
+</aside>
+<main class="main">
+<div class="row"><div><h2>My claims overview</h2><p class="sub">87 assigned · 5 overdue</p></div><button class="btn">Filter</button></div>
+<div class="grid-4">
+<div class="stat"><div class="stat-lbl">Assigned to me</div><div class="stat-val">87</div><div class="stat-sub">12 opened today</div></div>
+<div class="stat"><div class="stat-lbl">Due this week</div><div class="stat-val">23</div><div class="stat-sub delta-down">5 overdue</div></div>
+<div class="stat"><div class="stat-lbl">My avg TAT</div><div class="stat-val">14.2d</div><div class="stat-sub delta-up">under team avg</div></div>
+<div class="stat"><div class="stat-lbl">Denials (week)</div><div class="stat-val">9</div><div class="stat-sub">review needed</div></div>
+</div>
+<div class="grid-2">
+<div class="card">
+<div class="card-title">Top denial codes (my claims)</div>
+<div class="bar-wrap"><div class="bar-head"><span>D-101 Missing docs</span><span>12</span></div><div class="bar"><div class="bar-fill" style="width:85%;"></div></div></div>
+<div class="bar-wrap"><div class="bar-head"><span>D-204 Policy lapsed</span><span>7</span></div><div class="bar"><div class="bar-fill" style="width:50%;"></div></div></div>
+<div class="bar-wrap"><div class="bar-head"><span>D-311 Out of coverage</span><span>4</span></div><div class="bar"><div class="bar-fill" style="width:28%;"></div></div></div>
+<div class="bar-wrap"><div class="bar-head"><span>Other codes</span><span>3</span></div><div class="bar"><div class="bar-fill" style="width:22%;"></div></div></div>
+</div>
+<div class="card">
+<div class="card-title">Priority queue</div>
+<table>
+<tr><th>Claim</th><th>Age</th><th>Priority</th></tr>
+<tr><td>CL-48821</td><td>39d</td><td><span class="tag tag-red">High</span></td></tr>
+<tr><td>CL-48109</td><td>28d</td><td><span class="tag tag-yellow">Med</span></td></tr>
+<tr><td>CL-47998</td><td>21d</td><td><span class="tag tag-yellow">Med</span></td></tr>
+</table>
+</div>
+</div>
+</main>
+</div></div>
+
+<div class="label">ROLE 2 · CLAIMS MANAGER DASHBOARD</div>
+<div class="screen flush"><div class="layout">
+<aside class="sidebar">
+<div class="brand">ClaimInsight360<small>Manager workspace</small></div>
+<div class="nav-title">OVERVIEW</div>
+<div class="nav-item active">Team dashboard</div>
+<div class="nav-item">All claims</div>
+<div class="nav-title">TEAM</div>
+<div class="nav-item">Adjusters</div>
+<div class="nav-item">Workload</div>
+<div class="nav-item">SLA tracking</div>
+<div class="nav-title">ANALYSIS</div>
+<div class="nav-item">Denials</div>
+<div class="nav-item">Reports</div>
+<div class="nav-item">Notifications</div>
+<div class="user-tag"><b>Priya Menon</b><span class="role">Claims Manager</span></div>
+</aside>
+<main class="main">
+<div class="row"><div><h2>Team overview</h2><p class="sub">42 adjusters · Q1 2026</p></div><button class="btn btn-primary">Manage workload</button></div>
+<div class="alert alert-red">47 SLA breaches this period — 14 from Meera Thomas</div>
+<div class="grid-4">
+<div class="stat"><div class="stat-lbl">Open claims</div><div class="stat-val">14,287</div><div class="stat-sub delta-up">▲ 3.2%</div></div>
+<div class="stat"><div class="stat-lbl">Avg team TAT</div><div class="stat-val">18.4d</div><div class="stat-sub delta-down">1.1 over SLA</div></div>
+<div class="stat"><div class="stat-lbl">SLA breaches</div><div class="stat-val">47</div><div class="stat-sub delta-down">▲ 14</div></div>
+<div class="stat"><div class="stat-lbl">Team quality</div><div class="stat-val">86</div><div class="stat-sub delta-up">▲ 2 pts</div></div>
+</div>
+<div class="grid-2">
+<div class="card">
+<div class="card-title">Workload distribution</div>
+<svg viewBox="0 0 300 130" style="width:100%;height:130px;">
+<line x1="30" y1="105" x2="290" y2="105" stroke="#ccc" stroke-width="1"/>
+<line x1="30" y1="15" x2="30" y2="105" stroke="#ccc" stroke-width="1"/>
+<text x="22" y="108" text-anchor="end" font-size="9" fill="#888">0</text>
+<text x="22" y="62" text-anchor="end" font-size="9" fill="#888">100</text>
+<text x="22" y="20" text-anchor="end" font-size="9" fill="#888">200</text>
+<rect x="50" y="20" width="32" height="85" fill="#16a34a"/>
+<rect x="95" y="32" width="32" height="73" fill="#16a34a"/>
+<rect x="140" y="43" width="32" height="62" fill="#f59e0b"/>
+<rect x="185" y="47" width="32" height="58" fill="#f59e0b"/>
+<rect x="230" y="51" width="32" height="54" fill="#dc2626"/>
+<text x="66" y="122" text-anchor="middle" font-size="9" fill="#666">Ravi</text>
+<text x="111" y="122" text-anchor="middle" font-size="9" fill="#666">Aisha</text>
+<text x="156" y="122" text-anchor="middle" font-size="9" fill="#666">Daniel</text>
+<text x="201" y="122" text-anchor="middle" font-size="9" fill="#666">Jay</text>
+<text x="246" y="122" text-anchor="middle" font-size="9" fill="#666">Meera</text>
+</svg>
+</div>
+<div class="card">
+<div class="card-title">Aging buckets</div>
+<div class="bar-wrap"><div class="bar-head"><span>0–30 days</span><span>6,842</span></div><div class="bar"><div class="bar-fill" style="width:78%;background:#16a34a;"></div></div></div>
+<div class="bar-wrap"><div class="bar-head"><span>31–60 days</span><span>4,128</span></div><div class="bar"><div class="bar-fill" style="width:52%;"></div></div></div>
+<div class="bar-wrap"><div class="bar-head"><span>61–90 days</span><span>2,194</span></div><div class="bar"><div class="bar-fill" style="width:30%;background:#f59e0b;"></div></div></div>
+<div class="bar-wrap"><div class="bar-head"><span>90+ days</span><span style="color:#dc2626;">1,123</span></div><div class="bar"><div class="bar-fill" style="width:15%;background:#dc2626;"></div></div></div>
+</div>
+</div>
+</main>
+</div></div>
+
+<div class="label">ROLE 3 · FRAUD ANALYST DASHBOARD</div>
+<div class="screen flush"><div class="layout">
+<aside class="sidebar">
+<div class="brand">ClaimInsight360<small>Fraud workspace</small></div>
+<div class="nav-title">RISK</div>
+<div class="nav-item active">Risk dashboard</div>
+<div class="nav-item">Review queue</div>
+<div class="nav-item">Flagged claims</div>
+<div class="nav-title">INVESTIGATE</div>
+<div class="nav-item">Patterns</div>
+<div class="nav-item">Indicators</div>
+<div class="nav-item">Escalated</div>
+<div class="nav-item">Notifications</div>
+<div class="user-tag"><b>Arjun Shah</b><span class="role">Fraud Analyst</span></div>
+</aside>
+<main class="main">
+<div class="row"><div><h2>Risk command center</h2><p class="sub">342 high-risk claims need review</p></div><button class="btn btn-primary">Review queue</button></div>
+<div class="alert alert-red">27 new high-risk flags in last 24 hours</div>
+<div class="grid-4">
+<div class="stat" style="background:#fee2e2;border-color:#fecaca;"><div class="stat-lbl" style="color:#991b1b;">High-risk</div><div class="stat-val" style="color:#501313;">342</div><div class="stat-sub" style="color:#991b1b;">▲ 27 (7d)</div></div>
+<div class="stat" style="background:#fef3c7;border-color:#fde68a;"><div class="stat-lbl" style="color:#854d0e;">New flags</div><div class="stat-val" style="color:#582f0e;">89</div><div class="stat-sub" style="color:#854d0e;">▲ 12% WoW</div></div>
+<div class="stat"><div class="stat-lbl">Exposure</div><div class="stat-val">₹4.2Cr</div><div class="stat-sub delta-down">▲ ₹38L</div></div>
+<div class="stat"><div class="stat-lbl">Avg score</div><div class="stat-val">68</div><div class="stat-sub muted">of 100</div></div>
+</div>
+<div class="card">
+<div class="card-title">Risk score distribution</div>
+<svg viewBox="0 0 300 110" style="width:100%;height:110px;">
+<line x1="30" y1="85" x2="290" y2="85" stroke="#ccc" stroke-width="1"/>
+<line x1="30" y1="10" x2="30" y2="85" stroke="#ccc" stroke-width="1"/>
+<rect x="50" y="60" width="32" height="25" fill="#16a34a"/>
+<rect x="95" y="40" width="32" height="45" fill="#2563eb"/>
+<rect x="140" y="20" width="32" height="65" fill="#2563eb"/>
+<rect x="185" y="42" width="32" height="43" fill="#f59e0b"/>
+<rect x="230" y="62" width="32" height="23" fill="#dc2626"/>
+<text x="66" y="100" text-anchor="middle" font-size="9" fill="#666">0-20</text>
+<text x="111" y="100" text-anchor="middle" font-size="9" fill="#666">21-40</text>
+<text x="156" y="100" text-anchor="middle" font-size="9" fill="#666">41-70</text>
+<text x="201" y="100" text-anchor="middle" font-size="9" fill="#666">71-85</text>
+<text x="246" y="100" text-anchor="middle" font-size="9" fill="#666">86-100</text>
+</svg>
+</div>
+<table style="margin-top:10px;">
+<tr><th>Claim</th><th>Indicator</th><th>Score</th><th>Action</th></tr>
+<tr><td>CL-48821</td><td>High cost + unusual timing</td><td><span class="tag tag-red">94</span></td><td><button class="btn">Review</button></td></tr>
+<tr><td>CL-48109</td><td>Repeat pattern</td><td><span class="tag tag-yellow">78</span></td><td><button class="btn">Review</button></td></tr>
+<tr><td>CL-47998</td><td>Late filing</td><td><span class="tag tag-yellow">71</span></td><td><button class="btn">Review</button></td></tr>
+</table>
+</main>
+</div></div>
+
+<div class="label">ROLE 4 · ACTUARY DASHBOARD</div>
+<div class="screen flush"><div class="layout">
+<aside class="sidebar">
+<div class="brand">ClaimInsight360<small>Actuary workspace</small></div>
+<div class="nav-title">PORTFOLIO</div>
+<div class="nav-item active">Analytics</div>
+<div class="nav-item">Loss ratios</div>
+<div class="nav-item">Severity</div>
+<div class="nav-item">Frequency</div>
+<div class="nav-title">RESERVES</div>
+<div class="nav-item">Reserve trends</div>
+<div class="nav-item">Aging</div>
+<div class="nav-item">Reports</div>
+<div class="nav-item">Notifications</div>
+<div class="user-tag"><b>Lina Zhou</b><span class="role">Actuary</span></div>
+</aside>
+<main class="main">
+<div class="row"><div><h2>Portfolio analytics</h2><p class="sub">Severity, reserves, loss ratio</p></div><button class="btn">Export data</button></div>
+<div class="grid-4">
+<div class="stat"><div class="stat-lbl">Loss ratio</div><div class="stat-val">67.2%</div><div class="stat-sub delta-up">▼ 2.4 YoY</div></div>
+<div class="stat"><div class="stat-lbl">Avg severity</div><div class="stat-val">₹1.52L</div><div class="stat-sub delta-down">▲ 6.8%</div></div>
+<div class="stat"><div class="stat-lbl">Reserves</div><div class="stat-val">₹218Cr</div><div class="stat-sub delta-up">▼ 4.1%</div></div>
+<div class="stat"><div class="stat-lbl">Frequency</div><div class="stat-val">3.8%</div><div class="stat-sub muted">per policy</div></div>
+</div>
+<div class="grid-2">
+<div class="card">
+<div class="card-title">Severity trend (12 mo)</div>
+<svg viewBox="0 0 300 120" style="width:100%;height:120px;">
+<line x1="30" y1="95" x2="290" y2="95" stroke="#ccc" stroke-width="1"/>
+<line x1="30" y1="10" x2="30" y2="95" stroke="#ccc" stroke-width="1"/>
+<line x1="30" y1="52" x2="290" y2="52" stroke="#eee" stroke-width="1"/>
+<polyline points="50,75 90,70 130,60 170,50 210,45 250,35 280,30" fill="none" stroke="#5b21b6" stroke-width="2"/>
+<circle cx="50" cy="75" r="3" fill="#5b21b6"/>
+<circle cx="90" cy="70" r="3" fill="#5b21b6"/>
+<circle cx="130" cy="60" r="3" fill="#5b21b6"/>
+<circle cx="170" cy="50" r="3" fill="#5b21b6"/>
+<circle cx="210" cy="45" r="3" fill="#5b21b6"/>
+<circle cx="250" cy="35" r="3" fill="#5b21b6"/>
+<circle cx="280" cy="30" r="3" fill="#5b21b6"/>
+</svg>
+</div>
+<div class="card">
+<div class="card-title">Loss ratio by product</div>
+<div class="bar-wrap"><div class="bar-head"><span>Auto</span><span>72.4%</span></div><div class="bar"><div class="bar-fill" style="width:72%;background:#dc2626;"></div></div></div>
+<div class="bar-wrap"><div class="bar-head"><span>Health</span><span>68.1%</span></div><div class="bar"><div class="bar-fill" style="width:68%;background:#f59e0b;"></div></div></div>
+<div class="bar-wrap"><div class="bar-head"><span>Home</span><span>62.3%</span></div><div class="bar"><div class="bar-fill" style="width:62%;background:#16a34a;"></div></div></div>
+<div class="bar-wrap"><div class="bar-head"><span>Life</span><span>58.9%</span></div><div class="bar"><div class="bar-fill" style="width:59%;background:#16a34a;"></div></div></div>
+</div>
+</div>
+</main>
+</div></div>
+
+<div class="label">ROLE 5 · OPERATIONS EXECUTIVE DASHBOARD</div>
+<div class="screen flush"><div class="layout">
+<aside class="sidebar">
+<div class="brand">ClaimInsight360<small>Executive view</small></div>
+<div class="nav-title">SUMMARY</div>
+<div class="nav-item active">Executive dashboard</div>
+<div class="nav-item">KPI scorecard</div>
+<div class="nav-title">PERFORMANCE</div>
+<div class="nav-item">SLA compliance</div>
+<div class="nav-item">Cost trends</div>
+<div class="nav-item">Loss ratios</div>
+<div class="nav-title">REPORTS</div>
+<div class="nav-item">Monthly</div>
+<div class="nav-item">Quarterly</div>
+<div class="nav-item">Notifications</div>
+<div class="user-tag"><b>Rajesh Iyer</b><span class="role">Operations Exec</span></div>
+</aside>
+<main class="main">
+<div class="row"><div><h2>Executive summary</h2><p class="sub">Organization-wide KPIs</p></div><button class="btn">Monthly report</button></div>
+<div class="alert alert-green">SLA compliance 92.1% — above target (90%)</div>
+<div class="grid-4">
+<div class="stat"><div class="stat-lbl">Exposure</div><div class="stat-val">₹218Cr</div><div class="stat-sub delta-up">▼ 4.1% YoY</div></div>
+<div class="stat"><div class="stat-lbl">Loss ratio</div><div class="stat-val">67.2%</div><div class="stat-sub delta-up">▼ 2.4 pts</div></div>
+<div class="stat"><div class="stat-lbl">SLA compliance</div><div class="stat-val">92.1%</div><div class="stat-sub delta-up">above target</div></div>
+<div class="stat"><div class="stat-lbl">NPS</div><div class="stat-val">+42</div><div class="stat-sub delta-up">▲ 6 pts</div></div>
+</div>
+<div class="card">
+<div class="card-title">Monthly cost trend</div>
+<svg viewBox="0 0 300 120" style="width:100%;height:120px;">
+<line x1="30" y1="95" x2="290" y2="95" stroke="#ccc" stroke-width="1"/>
+<line x1="30" y1="10" x2="30" y2="95" stroke="#ccc" stroke-width="1"/>
+<rect x="40" y="50" width="22" height="45" fill="#2563eb"/>
+<rect x="72" y="42" width="22" height="53" fill="#2563eb"/>
+<rect x="104" y="46" width="22" height="49" fill="#2563eb"/>
+<rect x="136" y="36" width="22" height="59" fill="#2563eb"/>
+<rect x="168" y="38" width="22" height="57" fill="#2563eb"/>
+<rect x="200" y="30" width="22" height="65" fill="#2563eb"/>
+<rect x="232" y="26" width="22" height="69" fill="#2563eb"/>
+<rect x="264" y="20" width="22" height="75" fill="#2563eb"/>
+<text x="51" y="110" text-anchor="middle" font-size="9" fill="#666">Aug</text>
+<text x="83" y="110" text-anchor="middle" font-size="9" fill="#666">Sep</text>
+<text x="115" y="110" text-anchor="middle" font-size="9" fill="#666">Oct</text>
+<text x="147" y="110" text-anchor="middle" font-size="9" fill="#666">Nov</text>
+<text x="179" y="110" text-anchor="middle" font-size="9" fill="#666">Dec</text>
+<text x="211" y="110" text-anchor="middle" font-size="9" fill="#666">Jan</text>
+<text x="243" y="110" text-anchor="middle" font-size="9" fill="#666">Feb</text>
+<text x="275" y="110" text-anchor="middle" font-size="9" fill="#666">Mar</text>
+</svg>
+</div>
+</main>
+</div></div>
+
+<div class="label">ROLE 6 · ADMIN DASHBOARD</div>
+<div class="screen flush"><div class="layout">
+<aside class="sidebar">
+<div class="brand">ClaimInsight360<small>Admin console</small></div>
+<div class="nav-title">SYSTEM</div>
+<div class="nav-item active">System overview</div>
+<div class="nav-item">Data feeds</div>
+<div class="nav-item">KPI definitions</div>
+<div class="nav-title">ACCESS</div>
+<div class="nav-item">Users &amp; roles</div>
+<div class="nav-item">Audit log</div>
+<div class="nav-title">CONFIG</div>
+<div class="nav-item">Integrations</div>
+<div class="nav-item">Settings</div>
+<div class="user-tag"><b>System Admin</b><span class="role">Admin</span></div>
+</aside>
+<main class="main">
+<div class="row"><div><h2>System overview</h2><p class="sub">Platform health and activity</p></div><button class="btn btn-primary">Settings</button></div>
+<div class="alert alert-red">1 data feed in error state — feed-reserve-01</div>
+<div class="grid-4">
+<div class="stat"><div class="stat-lbl">Active users</div><div class="stat-val">48</div><div class="stat-sub muted">of 52 invited</div></div>
+<div class="stat"><div class="stat-lbl">Feeds healthy</div><div class="stat-val">3/4</div><div class="stat-sub delta-down">1 error</div></div>
+<div class="stat"><div class="stat-lbl">Pending invites</div><div class="stat-val">4</div><div class="stat-sub muted">sent this week</div></div>
+<div class="stat"><div class="stat-lbl">Uptime (7d)</div><div class="stat-val">99.9%</div><div class="stat-sub delta-up">within SLA</div></div>
+</div>
+<div class="grid-2">
+<div class="card">
+<div class="card-title">Data feed status</div>
+<table>
+<tr><th>Feed</th><th>Sync</th><th>Status</th></tr>
+<tr><td>feed-claim-01</td><td>12m</td><td><span class="tag tag-green">OK</span></td></tr>
+<tr><td>feed-policy-01</td><td>1h</td><td><span class="tag tag-green">OK</span></td></tr>
+<tr><td>feed-payment-01</td><td>4h</td><td><span class="tag tag-yellow">Slow</span></td></tr>
+<tr><td>feed-reserve-01</td><td>Failed</td><td><span class="tag tag-red">Error</span></td></tr>
+</table>
+</div>
+<div class="card">
+<div class="card-title">Recent audit events</div>
+<div style="font-size:11px;line-height:1.8;">
+<div><b>14:22</b> · p.menon viewed CL-48821</div>
+<div><b>14:08</b> · a.shah escalated CL-48109</div>
+<div><b>12:51</b> · admin updated KPI loss_ratio</div>
+<div><b>09:14</b> · l.zhou exported Q1 report</div>
+</div>
+</div>
+</div>
+</main>
+</div></div>
+
+<div class="label">SHARED · 09 · DENIAL ANALYSIS</div>
+<div class="screen">
+<div class="row"><div><h2>Denial Analysis</h2><p class="sub">1,212 denials this month</p></div></div>
+<div class="card" style="margin-bottom:14px;">
+<div class="card-title">Denial rate trend</div>
+<svg viewBox="0 0 300 140" style="width:100%;height:140px;">
+<line x1="30" y1="115" x2="290" y2="115" stroke="#ccc" stroke-width="1"/>
+<line x1="30" y1="20" x2="30" y2="115" stroke="#ccc" stroke-width="1"/>
+<line x1="30" y1="68" x2="290" y2="68" stroke="#eee" stroke-width="1"/>
+<polyline points="50,90 95,75 140,65 185,40 230,45 275,25" fill="none" stroke="#2563eb" stroke-width="2"/>
+<circle cx="50" cy="90" r="3" fill="#2563eb"/><circle cx="95" cy="75" r="3" fill="#2563eb"/><circle cx="140" cy="65" r="3" fill="#2563eb"/><circle cx="185" cy="40" r="3" fill="#2563eb"/><circle cx="230" cy="45" r="3" fill="#2563eb"/><circle cx="275" cy="25" r="3" fill="#2563eb"/>
+<text x="50" y="130" text-anchor="middle" font-size="10" fill="#666">Jan</text>
+<text x="95" y="130" text-anchor="middle" font-size="10" fill="#666">Feb</text>
+<text x="140" y="130" text-anchor="middle" font-size="10" fill="#666">Mar</text>
+<text x="185" y="130" text-anchor="middle" font-size="10" fill="#666">Apr</text>
+<text x="230" y="130" text-anchor="middle" font-size="10" fill="#666">May</text>
+<text x="275" y="130" text-anchor="middle" font-size="10" fill="#666">Jun</text>
+</svg>
+</div>
+<table>
+<tr><th>Code</th><th>Reason</th><th>Count</th><th>Trend</th><th>Avg Cost</th></tr>
+<tr><td>D-101</td><td>Missing documentation</td><td>412</td><td style="color:#dc2626;">▲ 12%</td><td>₹2,400</td></tr>
+<tr><td>D-204</td><td>Policy lapsed</td><td>287</td><td style="color:#16a34a;">▼ 4%</td><td>₹3,100</td></tr>
+<tr><td>D-311</td><td>Out of coverage</td><td>198</td><td style="color:#f59e0b;">▲ 2%</td><td>₹5,800</td></tr>
+<tr><td>D-412</td><td>Pre-existing condition</td><td>156</td><td>— 0%</td><td>₹4,200</td></tr>
+</table>
+</div>
+
+<div class="label">SHARED · 10 · ADJUSTERS</div>
+<div class="screen">
+<div class="row"><div><h2>Adjuster Performance</h2><p class="sub">42 active adjusters</p></div></div>
+<div class="grid-3">
+<div class="stat"><div class="stat-lbl">Active</div><div class="stat-val">42</div></div>
+<div class="stat"><div class="stat-lbl">SLA breaches</div><div class="stat-val">47</div></div>
+<div class="stat"><div class="stat-lbl">Avg quality</div><div class="stat-val">86</div></div>
+</div>
+<table>
+<tr><th>Name</th><th>Claims</th><th>Avg TAT</th><th>Quality</th><th>Breaches</th></tr>
+<tr><td>Ravi Kulkarni</td><td>187</td><td>12.4d</td><td><span class="tag tag-green">96</span></td><td>2</td></tr>
+<tr><td>Aisha Nair</td><td>164</td><td>14.1d</td><td><span class="tag tag-green">93</span></td><td>3</td></tr>
+<tr><td>Daniel Silva</td><td>152</td><td>16.8d</td><td><span class="tag tag-yellow">84</span></td><td>6</td></tr>
+<tr><td>Meera Thomas</td><td>141</td><td>22.3d</td><td><span class="tag tag-red">71</span></td><td>14</td></tr>
+</table>
+</div>
+
+<div class="label">SHARED · 11 · RESERVE &amp; COST</div>
+<div class="screen">
+<div class="row"><div><h2>Reserve &amp; Cost</h2><p class="sub">Portfolio exposure</p></div></div>
+<div class="grid-3">
+<div class="stat"><div class="stat-lbl">Total reserves</div><div class="stat-val">₹218Cr</div></div>
+<div class="stat"><div class="stat-lbl">Avg severity</div><div class="stat-val">₹1.52L</div></div>
+<div class="stat"><div class="stat-lbl">Paid YTD</div><div class="stat-val">₹87Cr</div></div>
+</div>
+<div class="grid-2">
+<div class="card">
+<div class="card-title">Cost by category</div>
+<div style="display:flex;align-items:center;gap:16px;">
+<svg viewBox="0 0 120 120" style="width:110px;height:110px;flex-shrink:0;">
+<circle cx="60" cy="60" r="50" fill="#2563eb"/>
+<path d="M 60 60 L 60 10 A 50 50 0 0 1 107.55 75.45 Z" fill="#16a34a"/>
+<path d="M 60 60 L 107.55 75.45 A 50 50 0 0 1 60 110 Z" fill="#f59e0b"/>
+<path d="M 60 60 L 60 110 A 50 50 0 0 1 17.27 84.55 Z" fill="#dc2626"/>
+</svg>
+<div>
+<div class="legend-item"><span class="legend-box" style="background:#2563eb;"></span>Medical 40%</div>
+<div class="legend-item"><span class="legend-box" style="background:#16a34a;"></span>Repair 28%</div>
+<div class="legend-item"><span class="legend-box" style="background:#f59e0b;"></span>Legal 18%</div>
+<div class="legend-item"><span class="legend-box" style="background:#dc2626;"></span>Settlement 14%</div>
+</div>
+</div>
+</div>
+<div class="card">
+<div class="card-title">Cost breakdown</div>
+<div class="bar-wrap"><div class="bar-head"><span>Medical</span><span>₹34.8Cr</span></div><div class="bar"><div class="bar-fill" style="width:80%;"></div></div></div>
+<div class="bar-wrap"><div class="bar-head"><span>Repair</span><span>₹24.3Cr</span></div><div class="bar"><div class="bar-fill" style="width:56%;background:#16a34a;"></div></div></div>
+<div class="bar-wrap"><div class="bar-head"><span>Legal</span><span>₹15.6Cr</span></div><div class="bar"><div class="bar-fill" style="width:36%;background:#f59e0b;"></div></div></div>
+<div class="bar-wrap"><div class="bar-head"><span>Settlement</span><span>₹12.2Cr</span></div><div class="bar"><div class="bar-fill" style="width:28%;background:#dc2626;"></div></div></div>
+</div>
+</div>
+</div>
+
+<div class="label">SHARED · 12 · CLAIM DETAIL</div>
+<div class="screen">
+<div class="row"><div><h2>Claim CL-48821</h2><p class="sub">Auto · filed 12 Mar 2026</p></div><span class="tag tag-red" style="padding:4px 12px;">Risk 94</span></div>
+<div class="grid-4">
+<div class="stat"><div class="stat-lbl">Reserve</div><div class="stat-val" style="font-size:16px;">₹8.4L</div></div>
+<div class="stat"><div class="stat-lbl">Paid</div><div class="stat-val" style="font-size:16px;">₹2.1L</div></div>
+<div class="stat"><div class="stat-lbl">Age</div><div class="stat-val" style="font-size:16px;">39 days</div></div>
+<div class="stat"><div class="stat-lbl">Adjuster</div><div class="stat-val" style="font-size:13px;padding-top:4px;">Meera T.</div></div>
+</div>
+<h3>Risk indicators</h3>
+<table>
+<tr><th>Indicator</th><th>Detail</th><th>Score</th></tr>
+<tr><td>High cost</td><td>4.2× category median</td><td>40</td></tr>
+<tr><td>Unusual timing</td><td>Filed 3 days post-renewal</td><td>32</td></tr>
+<tr><td>Document gap</td><td>Witness statement missing</td><td>22</td></tr>
+</table>
+<div style="margin-top:12px;"><button class="btn btn-danger">Escalate</button> <button class="btn">Investigate</button> <button class="btn">Approve</button></div>
+</div>
+
+<div class="label">SHARED · 13 · REPORTS</div>
+<div class="screen">
+<div class="row"><div><h2>Reports</h2><p class="sub">Build custom reports</p></div><button class="btn btn-primary">+ New report</button></div>
+<div class="grid-2">
+<div class="card">
+<div class="card-title">Filters</div>
+<label>Product</label><select class="input"><option>Auto</option><option>Home</option><option>Health</option></select>
+<label>Region</label><select class="input"><option>West</option><option>East</option></select>
+<label>Period</label><select class="input"><option>Q1 2026</option><option>Q4 2025</option></select>
+</div>
+<div class="card">
+<div class="card-title">Metrics</div>
+<div><input type="checkbox" checked> TAT</div>
+<div style="margin-top:6px;"><input type="checkbox" checked> Loss ratio</div>
+<div style="margin-top:6px;"><input type="checkbox" checked> Severity</div>
+<div style="margin-top:6px;"><input type="checkbox"> Frequency</div>
+<div style="margin-top:6px;"><input type="checkbox"> Denial rate</div>
+</div>
+</div>
+<div><button class="btn btn-primary">Generate</button> <button class="btn">Save</button> <button class="btn">Export PDF</button></div>
+</div>
+
+<div class="label">SHARED · 14 · NOTIFICATIONS</div>
+<div class="screen">
+<div class="row"><div><h2>Notifications</h2><p class="sub">4 unread</p></div><div><button class="btn">All</button> <button class="btn">Unread</button></div></div>
+<div class="card" style="padding:0;">
+<div class="notif"><div class="notif-dot" style="background:#dc2626;"></div><div style="flex:1;"><div style="font-weight:600;">Risk spike detected</div><div class="muted">27 new high-risk claims in last 24h</div></div><span class="muted">2m ago</span></div>
+<div class="notif"><div class="notif-dot" style="background:#f59e0b;"></div><div style="flex:1;"><div style="font-weight:600;">Denial rate threshold breached</div><div class="muted">Code D-101 up 12% WoW</div></div><span class="muted">1h ago</span></div>
+<div class="notif"><div class="notif-dot" style="background:#2563eb;"></div><div style="flex:1;"><div style="font-weight:600;">SLA watchlist</div><div class="muted">14 claims nearing 90-day</div></div><span class="muted">3h ago</span></div>
+<div class="notif" style="opacity:0.6;"><div class="notif-dot" style="background:#999;"></div><div style="flex:1;"><div>Weekly report generated</div><div class="muted">Ready for review</div></div><span class="muted">1d</span></div>
+</div>
+</div>
+
+<div class="label">ADMIN · 15 · DATA FEEDS</div>
+<div class="screen">
+<div class="row"><div><h2>Data Feeds</h2><p class="sub">4 active sources</p></div><button class="btn btn-primary">+ Add feed</button></div>
+<table>
+<tr><th>Feed</th><th>Type</th><th>Source</th><th>Last sync</th><th>Status</th></tr>
+<tr><td>feed-claim-01</td><td>Claim</td><td>Guidewire</td><td>12m ago</td><td><span class="tag tag-green">Healthy</span></td></tr>
+<tr><td>feed-policy-01</td><td>Policy</td><td>PAS Core</td><td>1h ago</td><td><span class="tag tag-green">Healthy</span></td></tr>
+<tr><td>feed-payment-01</td><td>Payment</td><td>Finance DW</td><td>4h ago</td><td><span class="tag tag-yellow">Lagging</span></td></tr>
+<tr><td>feed-reserve-01</td><td>Reserve</td><td>Actuarial</td><td>Failed</td><td><span class="tag tag-red">Error</span></td></tr>
+</table>
+</div>
+
+<div class="label">ADMIN · 16 · KPI DEFINITIONS</div>
+<div class="screen">
+<div class="row"><div><h2>KPI Definitions</h2><p class="sub">Configure metrics</p></div><button class="btn btn-primary">+ New KPI</button></div>
+<div class="grid-2">
+<div class="card">
+<div style="display:flex;justify-content:space-between;margin-bottom:8px;"><b>Avg TAT</b><span class="tag tag-green">Active</span></div>
+<div style="background:#f7f7f7;padding:6px 8px;border-radius:3px;font-family:monospace;font-size:11px;margin-bottom:8px;">avg(settled - filed)</div>
+<div class="muted">Unit: days · SLA: 17</div>
+</div>
+<div class="card">
+<div style="display:flex;justify-content:space-between;margin-bottom:8px;"><b>Loss Ratio</b><span class="tag tag-green">Active</span></div>
+<div style="background:#f7f7f7;padding:6px 8px;border-radius:3px;font-family:monospace;font-size:11px;margin-bottom:8px;">paid / premium</div>
+<div class="muted">Unit: % · Target: ≤70</div>
+</div>
+<div class="card">
+<div style="display:flex;justify-content:space-between;margin-bottom:8px;"><b>Severity</b><span class="tag tag-green">Active</span></div>
+<div style="background:#f7f7f7;padding:6px 8px;border-radius:3px;font-family:monospace;font-size:11px;margin-bottom:8px;">avg(total_cost)</div>
+<div class="muted">Unit: ₹ · By product</div>
+</div>
+<div class="card">
+<div style="display:flex;justify-content:space-between;margin-bottom:8px;"><b>Risk Score</b><span class="tag tag-green">Active</span></div>
+<div style="background:#f7f7f7;padding:6px 8px;border-radius:3px;font-family:monospace;font-size:11px;margin-bottom:8px;">sum(weight * severity)</div>
+<div class="muted">Scale: 0-100 · Alert: ≥70</div>
+</div>
+</div>
+</div>
+
+<div class="label">ADMIN · 17 · USERS &amp; ROLES</div>
+<div class="screen">
+<div class="row"><div><h2>Users</h2><p class="sub">4 active users</p></div><button class="btn btn-primary">+ Invite user</button></div>
+<table>
+<tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last active</th></tr>
+<tr><td>Priya Menon</td><td>p.menon@acme.com</td><td><span class="tag tag-blue">Claims Manager</span></td><td><span class="tag tag-green">Active</span></td><td>now</td></tr>
+<tr><td>Arjun Shah</td><td>a.shah@acme.com</td><td><span class="tag tag-blue">Fraud Analyst</span></td><td><span class="tag tag-green">Active</span></td><td>5m</td></tr>
+<tr><td>Lina Zhou</td><td>l.zhou@acme.com</td><td><span class="tag tag-blue">Actuary</span></td><td><span class="tag tag-green">Active</span></td><td>2h</td></tr>
+<tr><td>Omar Hassan</td><td>o.hassan@acme.com</td><td><span class="tag tag-blue">Analyst</span></td><td><span class="tag tag-yellow">Invited</span></td><td>—</td></tr>
+</table>
+</div>
+
+</div>
+</body>
+</html>

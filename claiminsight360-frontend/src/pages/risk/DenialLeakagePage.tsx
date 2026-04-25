@@ -7,6 +7,11 @@ import { PlusOutlined, ReloadOutlined, DeleteOutlined, WarningOutlined } from '@
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import {
+  BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend, CartesianGrid,
+} from 'recharts';
+import ChartCard, { CHART_COLORS, CHART_PALETTE } from '../../components/charts/ChartCard';
+import {
   denialPatternsApi, leakageFlagsApi,
   DenialPattern, LeakageFlag,
   CreateDenialPatternRequest, CreateLeakageFlagRequest,
@@ -133,6 +138,24 @@ export default function DenialLeakagePage() {
 
   const totalLeakage = state.flags.reduce((s, f) => s + (f.estimatedLoss ?? 0), 0);
 
+  // ── Chart data ────────────────────────────────────────────────────────────
+  const denialByCode = Object.entries(
+    state.patterns.reduce<Record<string, number>>((acc, p) => {
+      acc[p.denialCode] = (acc[p.denialCode] ?? 0) + 1;
+      return acc;
+    }, {}),
+  )
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+
+  const leakageByType = Object.entries(
+    state.flags.reduce<Record<string, number>>((acc, f) => {
+      acc[f.leakageType] = (acc[f.leakageType] ?? 0) + f.estimatedLoss;
+      return acc;
+    }, {}),
+  ).map(([name, value]) => ({ name, value: Number(value.toFixed(2)) }));
+
   const patternColumns: ColumnsType<DenialPattern> = [
     { title: 'ID',          dataIndex: 'patternId',      key: 'patternId',      width: 80 },
     { title: 'Claim',       dataIndex: 'claimId',        key: 'claimId',        render: v => <Text code>{v}</Text> },
@@ -204,6 +227,52 @@ export default function DenialLeakagePage() {
       </Row>
 
       {state.error && <Alert type="error" message={state.error} style={{ marginBottom: 16 }} />}
+
+      {/* Charts */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col xs={24} lg={14}>
+          <ChartCard
+            title="Top Denial Codes"
+            subtitle="Most-frequent denial reasons (top 8)"
+            loading={state.loadingPatterns}
+            isEmpty={!state.loadingPatterns && denialByCode.length === 0}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={denialByCode} layout="vertical" margin={{ top: 10, right: 20, bottom: 0, left: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--ci-border)" />
+                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} />
+                <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} width={70} />
+                <RTooltip contentStyle={{ background: 'var(--ci-bg-surface)', border: '1px solid var(--ci-border)', borderRadius: 8 }} />
+                <Bar dataKey="count" fill={CHART_COLORS.danger} radius={[0, 6, 6, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Col>
+
+        <Col xs={24} lg={10}>
+          <ChartCard
+            title="Leakage by Type"
+            subtitle="Total estimated loss ($) per leakage category"
+            loading={state.loadingFlags}
+            isEmpty={!state.loadingFlags && leakageByType.length === 0}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={leakageByType} dataKey="value" nameKey="name"
+                  cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={2}
+                  label={(e) => `$${Number(e.value).toLocaleString()}`}>
+                  {leakageByType.map((_, i) => (
+                    <Cell key={i} fill={CHART_PALETTE[i % CHART_PALETTE.length]} />
+                  ))}
+                </Pie>
+                <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                <RTooltip formatter={(v) => `$${Number(v).toLocaleString()}`}
+                  contentStyle={{ background: 'var(--ci-bg-surface)', border: '1px solid var(--ci-border)', borderRadius: 8 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Col>
+      </Row>
 
       <Tabs
         items={[

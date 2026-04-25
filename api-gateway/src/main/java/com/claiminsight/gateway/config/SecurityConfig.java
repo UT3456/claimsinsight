@@ -65,6 +65,11 @@ public class SecurityConfig {
                                 "ROLE_CLAIMS_ANALYST", "ROLE_CLAIMS_MANAGER",
                                 "ROLE_ACTUARY", "ROLE_OPERATIONS_EXEC", "ROLE_ADMIN")
 
+                        // Claim ACTIVE/INACTIVE status — same roles as KPIs
+                        .pathMatchers("/api/claim-status/**").hasAnyAuthority(
+                                "ROLE_CLAIMS_ANALYST", "ROLE_CLAIMS_MANAGER",
+                                "ROLE_ACTUARY", "ROLE_OPERATIONS_EXEC", "ROLE_ADMIN")
+
                         // ── Data Ingestion / Feeds ──────────────────────────────────────
                         // Analysts (need raw data) + Admin
                         .pathMatchers("/api/feeds/**", "/api/ingest/**").hasAnyAuthority(

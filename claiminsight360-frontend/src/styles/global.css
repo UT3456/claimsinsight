@@ -7,16 +7,274 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    'Helvetica Neue', Arial, sans-serif;
+  font-family: Arial, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: var(--ci-bg-app);
+  color: var(--ci-text-primary);
+  font-size: 13px;
 }
 
-/* Remove default Ant Design blue outline on inputs */
+/* ============================================================
+   Theme Variables — LIGHT (matches reference)
+   Primary: #2563eb  Bg: #f5f5f5  Surface: #fff  Border: #ddd
+   ============================================================ */
+:root,
+:root[data-theme='light'] {
+  --ci-bg-app:        #f5f5f5;
+  --ci-bg-surface:    #ffffff;
+  --ci-bg-surface-2:  #f7f7f7;
+  --ci-bg-sidebar:    #f7f7f7;
+  --ci-bg-hover:      #eef2f7;
+  --ci-bg-subtle:     #f7f7f7;
+
+  --ci-text-primary:  #222222;
+  --ci-text-secondary:#555555;
+  --ci-text-muted:    #888888;
+
+  --ci-border:        #dddddd;
+  --ci-border-strong: #bbbbbb;
+
+  --ci-primary:       #2563eb;
+  --ci-primary-hover: #1d4ed8;
+
+  --ci-accent-success:#16a34a;
+  --ci-accent-warn:   #d97706;
+  --ci-accent-danger: #dc2626;
+
+  --ci-radius:        4px;
+  --ci-shadow-sm:     0 1px 3px rgba(0,0,0,0.08);
+  --ci-shadow-md:     0 2px 8px rgba(0,0,0,0.10);
+}
+
+/* ============================================================
+   Theme Variables — DARK
+   ============================================================ */
+:root[data-theme='dark'] {
+  --ci-bg-app:        #1B2430;
+  --ci-bg-surface:    #27374D;
+  --ci-bg-surface-2:  #2E4364;
+  --ci-bg-sidebar:    #1e2d3d;
+  --ci-bg-hover:      #344966;
+  --ci-bg-subtle:     #2E4364;
+
+  --ci-text-primary:  #e8edf2;
+  --ci-text-secondary:#9DB2BF;
+  --ci-text-muted:    #7A90A4;
+
+  --ci-border:        #344966;
+  --ci-border-strong: #526D82;
+
+  --ci-primary:       #3b82f6;
+  --ci-primary-hover: #60a5fa;
+
+  --ci-accent-success:#3CB371;
+  --ci-accent-warn:   #F8E16C;
+  --ci-accent-danger: #F45B69;
+
+  --ci-radius:        4px;
+  --ci-shadow-sm:     0 1px 4px rgba(0, 0, 0, 0.4);
+  --ci-shadow-md:     0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* Smooth theme transition on non-interactive elements */
+*, *::before, *::after {
+  transition:
+    background-color 0.2s ease,
+    border-color     0.2s ease,
+    color            0.2s ease;
+}
+input, select, textarea, button { transition: none; }
+
+/* Ant Design overrides */
+:root[data-theme='dark'] .ant-layout,
+:root[data-theme='dark'] body {
+  background: var(--ci-bg-app);
+}
+
 .ant-input:focus,
 .ant-input-affix-wrapper:focus,
 .ant-input-affix-wrapper-focused {
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15) !important;
   border-color: #2563eb !important;
+}
+
+/* Override Ant Design default border-radius to match reference */
+.ant-card {
+  border-radius: var(--ci-radius) !important;
+  border: 1px solid var(--ci-border) !important;
+  box-shadow: none !important;
+}
+
+.ant-btn {
+  border-radius: var(--ci-radius) !important;
+}
+
+.ant-table-wrapper .ant-table {
+  font-size: 12px;
+}
+
+.ant-table-wrapper .ant-table-thead > tr > th {
+  background: #f7f7f7 !important;
+  font-size: 11px;
+  font-weight: 600;
+  color: #555;
+}
+
+/* ============================================================
+   Reference-style utility classes
+   ============================================================ */
+
+/* Stat card */
+.ci-stat {
+  background: var(--ci-bg-surface-2);
+  border: 1px solid var(--ci-border);
+  padding: 10px 14px;
+  border-radius: var(--ci-radius);
+}
+.ci-stat-lbl { font-size: 11px; color: var(--ci-text-muted); }
+.ci-stat-val { font-size: 20px; font-weight: bold; margin-top: 4px; color: var(--ci-text-primary); }
+
+/* Tag color variants matching reference */
+.tag-green  { display:inline-block; padding:2px 8px; border-radius:3px; font-size:11px; background:#dcfce7; color:#166534; }
+.tag-red    { display:inline-block; padding:2px 8px; border-radius:3px; font-size:11px; background:#fee2e2; color:#991b1b; }
+.tag-yellow { display:inline-block; padding:2px 8px; border-radius:3px; font-size:11px; background:#fef3c7; color:#854d0e; }
+.tag-blue   { display:inline-block; padding:2px 8px; border-radius:3px; font-size:11px; background:#dbeafe; color:#1e40af; }
+
+/* Progress bar */
+.ci-bar-wrap { margin-bottom: 8px; }
+.ci-bar-head { display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px; color: var(--ci-text-secondary); }
+.ci-bar      { height:6px; background:#eee; border-radius:3px; overflow:hidden; }
+.ci-bar-fill { height:100%; background:var(--ci-primary); border-radius:3px; }
+
+/* Notification list item */
+.ci-notif-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ci-border);
+  align-items: flex-start;
+  background: var(--ci-bg-surface);
+  cursor: pointer;
+}
+.ci-notif-item:last-child { border-bottom: none; }
+.ci-notif-item:hover { background: var(--ci-bg-hover); }
+.ci-notif-item.unread { background: #f0f6ff; }
+:root[data-theme='dark'] .ci-notif-item.unread { background: #1e3352; }
+
+.ci-notif-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+.ci-notif-title   { font-weight: 600; font-size: 13px; color: var(--ci-text-primary); margin-bottom: 2px; }
+.ci-notif-message { font-size: 12px; color: var(--ci-text-muted); }
+.ci-notif-time    { font-size: 11px; color: var(--ci-text-muted); white-space: nowrap; }
+
+/* Alert variants */
+.ci-alert {
+  padding: 10px 14px;
+  border-radius: var(--ci-radius);
+  font-size: 12px;
+  margin-bottom: 14px;
+}
+.ci-alert-red    { background:#fee2e2; color:#991b1b; border:1px solid #fecaca; }
+.ci-alert-yellow { background:#fef3c7; color:#854d0e; border:1px solid #fde68a; }
+.ci-alert-blue   { background:#dbeafe; color:#1e40af; border:1px solid #bfdbfe; }
+
+/* Auth page card */
+.ci-auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f5f5;
+  padding: 24px 16px;
+}
+.ci-auth-card {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: var(--ci-radius);
+  padding: 32px 36px;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: var(--ci-shadow-md);
+}
+
+/* ============================================================
+   Theme Toggle — animated sun/moon slide switch (unchanged)
+   ============================================================ */
+.ci360-theme-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 30px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  outline: none;
+}
+
+.ci360-theme-toggle:focus-visible .ci360-theme-toggle__track {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);
+}
+
+.ci360-theme-toggle__track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  transition: background 0.35s ease, border-color 0.35s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 7px;
+  overflow: hidden;
+}
+
+.ci360-theme-toggle.is-dark .ci360-theme-toggle__track {
+  background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.ci360-theme-toggle__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  opacity: 0.95;
+  z-index: 1;
+  transition: transform 0.35s ease, opacity 0.35s ease;
+}
+
+.ci360-theme-toggle.is-dark  .ci360-theme-toggle__icon--sun  { opacity: 0.35; transform: scale(0.85); }
+.ci360-theme-toggle.is-light .ci360-theme-toggle__icon--moon { opacity: 0.35; transform: scale(0.85); }
+
+.ci360-theme-toggle__thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  transition: transform 0.35s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+}
+
+.ci360-theme-toggle.is-dark .ci360-theme-toggle__thumb {
+  transform: translateX(26px);
+  background: #f8fafc;
+}
+
+.ci360-theme-toggle:hover .ci360-theme-toggle__thumb {
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
 }

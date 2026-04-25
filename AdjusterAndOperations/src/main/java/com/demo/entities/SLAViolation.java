@@ -7,6 +7,12 @@ import java.util.Date;
 
 /**
  * Persistence entity representing the 'sla_violation' table.
+ *
+ * <p>{@code claimId} is a soft reference to the {@code claim} table owned by
+ * claims-metrics-service. We deliberately do NOT model a JPA {@code @ManyToOne}
+ * relationship here because the {@code claim} table lives in another service
+ * and should be reached via the Feign client, not through a cross-module FK.
+ * This mirrors how every other microservice in the platform refers to claims.</p>
  */
 @Getter
 @Setter
@@ -23,9 +29,8 @@ public class SLAViolation {
     @Column(name = "violation_id")
     private Long violationId;
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "claim_id", referencedColumnName = "claim_id")
-    private Claim claim;
+    @Column(name = "claim_id")
+    private Long claimId;
 
     @Column(name = "adjuster_id", nullable = false)
     private Long adjusterId;

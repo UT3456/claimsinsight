@@ -7,12 +7,17 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 import com.claiminsight.metrics.client.DataIngestionClient;
+import com.claiminsight.metrics.client.NotificationServiceClient;
 import com.claiminsight.metrics.client.dto.ClaimRawDTO;
+import com.claiminsight.metrics.client.dto.NotificationRequestDTO;
+import com.claiminsight.metrics.client.dto.NotificationDispatchRequestDTO;
 import com.claiminsight.metrics.dto.ClaimKpiResponseDTO;
 import com.claiminsight.metrics.dto.KpiSummaryDTO;
 import com.claiminsight.metrics.exception.ResourceNotFoundException;
@@ -36,10 +41,21 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class KpiCalculationService {
 
+    /** Operational KPI thresholds — breaching any triggers a PERFORMANCE notification. */
+    private static final BigDecimal TAT_THRESHOLD_DAYS         = BigDecimal.valueOf(30);
+    private static final BigDecimal CYCLE_TIME_THRESHOLD_DAYS  = BigDecimal.valueOf(60);
+    private static final BigDecimal LOSS_RATIO_THRESHOLD       = BigDecimal.ONE; // 1.0 = claims exceed premiums
+    private static final BigDecimal SEVERITY_THRESHOLD         = BigDecimal.valueOf(8); // scale 1-10
+    private static final Set<String> PERFORMANCE_ALERT_ROLES   = Set.of("MANAGER", "EXECUTIVE");
+
     private final DataIngestionClient dataIngestionClient;
     private final ClaimKpiRepository  claimKpiRepository;
     private final ClaimKpiMapper      claimKpiMapper;
     private final ObjectMapper        objectMapper;
+
+    /** Optional: null when NotificationService is unreachable. Notifications are non-blocking. */
+    @Autowired(required = false)
+    private NotificationServiceClient notificationServiceClient;
 
     /**
      * Fetches raw claim records from data-ingestion-service via Feign,
@@ -120,7 +136,51 @@ public class KpiCalculationService {
         log.info("KPIs saved for claimId: {} — TAT={}, CYCLE_TIME={}, SEVERITY={}, FREQUENCY={}, LOSS_RATIO={}, SETTLEMENT_TIME={}",
                 claimId, tat, cycleTime, severity, frequency, lossRatio, settlementTime);
 
+        checkThresholdsAndNotify(claimId, tat, cycleTime, severity, lossRatio);
+
         return new KpiSummaryDTO(claimId, tat, cycleTime, severity, frequency, lossRatio, settlementTime, calculatedDate, savedKpis);
+    }
+
+    /**
+     * Inspects the freshly-computed KPIs and fires a single PERFORMANCE notification
+     * when one or more operational thresholds are breached. A consolidated alert
+     * is preferred over per-metric spam.
+     */
+    private void checkThresholdsAndNotify(String claimId, BigDecimal tat, BigDecimal cycleTime,
+                                          BigDecimal severity, BigDecimal lossRatio) {
+        if (notificationServiceClient == null) return;
+
+        List<String> breaches = new ArrayList<>();
+        if (tat.compareTo(TAT_THRESHOLD_DAYS) > 0) {
+            breaches.add("TAT " + tat + "d > " + TAT_THRESHOLD_DAYS + "d");
+        }
+        if (cycleTime.compareTo(CYCLE_TIME_THRESHOLD_DAYS) > 0) {
+            breaches.add("Cycle time " + cycleTime + "d > " + CYCLE_TIME_THRESHOLD_DAYS + "d");
+        }
+        if (lossRatio.compareTo(LOSS_RATIO_THRESHOLD) > 0) {
+            breaches.add("Loss ratio " + lossRatio + " > " + LOSS_RATIO_THRESHOLD);
+        }
+        if (severity.compareTo(SEVERITY_THRESHOLD) >= 0) {
+            breaches.add("Severity " + severity + " ≥ " + SEVERITY_THRESHOLD);
+        }
+
+        if (breaches.isEmpty()) return;
+
+        try {
+            NotificationDispatchRequestDTO notification = NotificationDispatchRequestDTO.builder()
+                    .targetRoles(PERFORMANCE_ALERT_ROLES)
+                    .title("KPI Threshold Breach - Claim " + claimId)
+                    .message("Performance thresholds breached on claim " + claimId + ": "
+                            + String.join("; ", breaches) + ". Review recommended.")
+                    .category("PERFORMANCE")
+                    .referenceId(claimId)
+                    .build();
+            notificationServiceClient.dispatchNotification(notification);
+            log.info("Sent PERFORMANCE notification for claim {} to roles {} ({} breach(es))",
+                    claimId, PERFORMANCE_ALERT_ROLES, breaches.size());
+        } catch (Exception e) {
+            log.warn("Failed to send PERFORMANCE notification for claim {}: {}", claimId, e.getMessage());
+        }
     }
 
     private ClaimKpiResponseDTO saveKpi(String claimId, MetricName name, BigDecimal value, LocalDate date) {

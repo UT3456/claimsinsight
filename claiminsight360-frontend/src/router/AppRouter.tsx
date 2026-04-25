@@ -8,7 +8,7 @@ import AppLayout                   from '../layouts/AppLayout';
 // ── Lazy-loaded pages ─────────────────────────────────────────────────────────
 const LoginPage         = lazy(() => import('../pages/auth/LoginPage'));
 const RegisterPage      = lazy(() => import('../pages/auth/RegisterPage'));
-const Dashboard         = lazy(() => import('../pages/dashboard/Dashboard'));
+const DashboardRouter   = lazy(() => import('../pages/dashboard/DashboardRouter'));
 
 // Claims Analytics
 const ClaimsPage        = lazy(() => import('../pages/claims/ClaimsPage'));
@@ -35,7 +35,9 @@ const ReportsPage       = lazy(() => import('../pages/reports/ReportsPage'));
 const NotificationsPage = lazy(() => import('../pages/notifications/NotificationsPage'));
 
 // Admin
-const AuditLogsPage     = lazy(() => import('../pages/admin/AuditLogsPage'));
+const AuditLogsPage       = lazy(() => import('../pages/admin/AuditLogsPage'));
+const KpiDefinitionsPage  = lazy(() => import('../pages/admin/KpiDefinitionsPage'));
+const UsersRolesPage      = lazy(() => import('../pages/admin/UsersRolesPage'));
 
 // Profile
 const ProfilePage       = lazy(() => import('../pages/profile/ProfilePage'));
@@ -59,8 +61,8 @@ export default function AppRouter() {
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
 
-            {/* Dashboard — all roles */}
-            <Route path="/dashboard" element={<Dashboard />} />
+            {/* Dashboard — role-specific component picked by DashboardRouter */}
+            <Route path="/dashboard" element={<DashboardRouter />} />
 
             {/* Claims Analytics — CLAIMS_ANALYST, CLAIMS_MANAGER, ACTUARY, OPERATIONS_EXEC, ADMIN */}
             <Route element={<RoleRoute />}>
@@ -101,7 +103,9 @@ export default function AppRouter() {
 
             {/* Admin only */}
             <Route element={<RoleRoute />}>
-              <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
+              <Route path="/admin/audit-logs"      element={<AuditLogsPage />} />
+              <Route path="/admin/kpi-definitions" element={<KpiDefinitionsPage />} />
+              <Route path="/admin/users"           element={<UsersRolesPage />} />
             </Route>
 
           </Route>

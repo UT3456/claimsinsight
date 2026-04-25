@@ -8,6 +8,11 @@ import { PlusOutlined, ReloadOutlined, DeleteOutlined, DollarOutlined } from '@a
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { costsApi, ClaimCost, CreateCostRequest, COST_TYPES } from '../../api/financialApi';
+import {
+  PieChart, Pie, Cell, Legend, ResponsiveContainer, Tooltip as RTooltip,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+} from 'recharts';
+import ChartCard, { CHART_COLORS, CHART_PALETTE } from '../../components/charts/ChartCard';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -98,6 +103,22 @@ export default function CostsPage() {
     [t]: state.items.filter(i => i.costType === t).reduce((s, i) => s + i.amount, 0),
   }), {} as Record<string, number>);
 
+  // ── Chart data ────────────────────────────────────────────────────────────
+  const costTypeData = COST_TYPES
+    .map((t) => ({ name: t, value: Number((byCostType[t] ?? 0).toFixed(2)) }))
+    .filter(d => d.value > 0);
+
+  const monthlyTrend = Object.entries(
+    state.items.reduce<Record<string, number>>((acc, i) => {
+      const m = i.costDate?.slice(0, 7);
+      if (!m) return acc;
+      acc[m] = (acc[m] ?? 0) + i.amount;
+      return acc;
+    }, {}),
+  )
+    .map(([month, amount]) => ({ month, amount: Number(amount.toFixed(2)) }))
+    .sort((a, b) => a.month.localeCompare(b.month));
+
   const columns: ColumnsType<ClaimCost> = [
     { title: 'Cost ID',  dataIndex: 'costId',   key: 'costId',  width: 90 },
     { title: 'Claim ID', dataIndex: 'claimId',  key: 'claimId', render: v => <Text code>{v}</Text> },
@@ -159,6 +180,59 @@ export default function CostsPage() {
       </Row>
 
       {state.error && <Alert type="error" message={state.error} style={{ marginBottom: 16 }} />}
+
+      {/* Charts */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col xs={24} lg={10}>
+          <ChartCard
+            title="Cost Mix by Type"
+            subtitle="Total spend per cost category"
+            loading={state.loading}
+            isEmpty={!state.loading && costTypeData.length === 0}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={costTypeData} dataKey="value" nameKey="name"
+                  cx="50%" cy="50%" innerRadius={55} outerRadius={95} paddingAngle={2}>
+                  {costTypeData.map((_, i) => (
+                    <Cell key={i} fill={CHART_PALETTE[i % CHART_PALETTE.length]} />
+                  ))}
+                </Pie>
+                <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                <RTooltip formatter={(v) => `$${Number(v).toLocaleString()}`}
+                  contentStyle={{ background: 'var(--ci-bg-surface)', border: '1px solid var(--ci-border)', borderRadius: 8 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Col>
+
+        <Col xs={24} lg={14}>
+          <ChartCard
+            title="Monthly Cost Trend"
+            subtitle="Aggregate spend across all claims"
+            loading={state.loading}
+            isEmpty={!state.loading && monthlyTrend.length === 0}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={monthlyTrend} margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
+                <defs>
+                  <linearGradient id="costGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor={CHART_COLORS.primary} stopOpacity={0.5} />
+                    <stop offset="95%" stopColor={CHART_COLORS.primary} stopOpacity={0.05} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--ci-border)" />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} />
+                <RTooltip formatter={(v) => `$${Number(v).toLocaleString()}`}
+                  contentStyle={{ background: 'var(--ci-bg-surface)', border: '1px solid var(--ci-border)', borderRadius: 8 }} />
+                <Area type="monotone" dataKey="amount" stroke={CHART_COLORS.primary}
+                  strokeWidth={2.5} fill="url(#costGrad)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Col>
+      </Row>
 
       <Table
         rowKey="costId"

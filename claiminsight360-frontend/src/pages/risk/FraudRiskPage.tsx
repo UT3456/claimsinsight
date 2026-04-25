@@ -1,11 +1,16 @@
 import { useEffect, useReducer, useCallback } from 'react';
 import {
   Table, Button, Modal, Form, Input, Select, DatePicker, Tabs,
-  Typography, Space, Tag, Alert, Tooltip, Popconfirm, Card, Row, Col, Statistic,
+  Typography, Tag, Alert, Tooltip, Popconfirm, Row, Col,
 } from 'antd';
-import { PlusOutlined, ReloadOutlined, DeleteOutlined, SafetyOutlined } from '@ant-design/icons';
+import { PlusOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend, CartesianGrid,
+} from 'recharts';
+import ChartCard, { CHART_COLORS, CHART_PALETTE } from '../../components/charts/ChartCard';
 import {
   riskScoresApi, riskIndicatorsApi,
   RiskScore, RiskIndicator,
@@ -132,6 +137,33 @@ export default function FraudRiskPage() {
   const highRisk = state.scores.filter(s => s.scoreValue >= 75).length;
   const highSev  = state.indicators.filter(i => i.severity === 'HIGH').length;
 
+  // ── Chart data ────────────────────────────────────────────────────────────
+  const scoreBuckets = [
+    { name: 'Low (0-49)',     count: state.scores.filter(s => s.scoreValue < 50).length,                          color: CHART_COLORS.success },
+    { name: 'Medium (50-74)', count: state.scores.filter(s => s.scoreValue >= 50 && s.scoreValue < 75).length,    color: CHART_COLORS.accent2 },
+    { name: 'High (75-89)',   count: state.scores.filter(s => s.scoreValue >= 75 && s.scoreValue < 90).length,    color: CHART_COLORS.danger },
+    { name: 'Critical (90+)', count: state.scores.filter(s => s.scoreValue >= 90).length,                         color: '#991b1b' },
+  ];
+
+  const indicatorByType = Object.entries(
+    state.indicators.reduce<Record<string, number>>((acc, i) => {
+      acc[i.indicatorType] = (acc[i.indicatorType] ?? 0) + 1;
+      return acc;
+    }, {}),
+  ).map(([name, value]) => ({ name, value }));
+
+  const severityTrend = Object.entries(
+    state.indicators.reduce<Record<string, { HIGH: number; MEDIUM: number; LOW: number }>>((acc, i) => {
+      const d = i.triggeredDate;
+      acc[d] = acc[d] ?? { HIGH: 0, MEDIUM: 0, LOW: 0 };
+      acc[d][i.severity as 'HIGH' | 'MEDIUM' | 'LOW']++;
+      return acc;
+    }, {}),
+  )
+    .map(([date, s]) => ({ date, ...s }))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-10);
+
   const scoreColumns: ColumnsType<RiskScore> = [
     { title: 'ID',      dataIndex: 'scoreId',     key: 'scoreId',     width: 80 },
     { title: 'Claim',   dataIndex: 'claimId',     key: 'claimId',     render: v => <Text code>{v}</Text> },
@@ -178,30 +210,113 @@ export default function FraudRiskPage() {
 
   return (
     <div>
-      <div style={styles.header}>
+      {/* ── Page header ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <Title level={3} style={{ margin: 0 }}>Fraud & Risk Intelligence</Title>
-          <Text type="secondary">Risk scores and fraud indicators</Text>
+          <Title level={4} style={{ margin: 0, color: 'var(--ci-text-primary)' }}>Fraud & Risk Intelligence</Title>
+          <Text style={{ fontSize: 12, color: 'var(--ci-text-muted)' }}>Risk scores and fraud indicators</Text>
         </div>
       </div>
 
-      <Row gutter={16} style={{ marginBottom: 24 }}>
+      {/* ── High-risk alert banner ── */}
+      {highRisk > 0 && (
+        <div className="ci-alert ci-alert-red">
+          ⚠ {highRisk} high-risk claim{highRisk !== 1 ? 's' : ''} detected with score ≥ 75 — immediate review recommended.
+        </div>
+      )}
+      {highSev > 0 && (
+        <div className="ci-alert ci-alert-yellow">
+          {highSev} high-severity fraud indicator{highSev !== 1 ? 's' : ''} flagged. Investigate before settlement.
+        </div>
+      )}
+
+      {/* ── Stat row ── */}
+      <Row gutter={10} style={{ marginBottom: 20 }}>
         {[
-          { title: 'Risk Scores',       value: state.scores.length,     color: '#2563eb' },
-          { title: 'High Risk (≥75)',   value: highRisk,                color: '#dc2626' },
-          { title: 'Risk Indicators',   value: state.indicators.length, color: '#7c3aed' },
-          { title: 'High Severity',     value: highSev,                 color: '#dc2626' },
+          { label: 'Risk Scores',       value: state.scores.length,     color: '#2563eb' },
+          { label: 'High Risk (≥75)',   value: highRisk,                color: '#dc2626' },
+          { label: 'Risk Indicators',   value: state.indicators.length, color: '#7c3aed' },
+          { label: 'High Severity',     value: highSev,                 color: '#dc2626' },
         ].map(c => (
-          <Col xs={12} sm={6} key={c.title}>
-            <Card style={styles.statCard}>
-              <Statistic title={c.title} value={c.value} valueStyle={{ color: c.color }}
-                prefix={<SafetyOutlined />} />
-            </Card>
+          <Col xs={12} sm={6} key={c.label}>
+            <div className="ci-stat">
+              <div className="ci-stat-lbl">{c.label}</div>
+              <div className="ci-stat-val" style={{ color: c.color }}>{c.value}</div>
+            </div>
           </Col>
         ))}
       </Row>
 
       {state.error && <Alert type="error" message={state.error} style={{ marginBottom: 16 }} />}
+
+      {/* Charts */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col xs={24} lg={12}>
+          <ChartCard
+            title="Risk Score Distribution"
+            subtitle="Number of claims per risk bucket"
+            loading={state.loadingScores}
+            isEmpty={!state.loadingScores && state.scores.length === 0}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={scoreBuckets} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--ci-border)" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} />
+                <RTooltip contentStyle={{ background: 'var(--ci-bg-surface)', border: '1px solid var(--ci-border)', borderRadius: 8 }} />
+                <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                  {scoreBuckets.map((b, i) => <Cell key={i} fill={b.color} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Col>
+
+        <Col xs={24} lg={12}>
+          <ChartCard
+            title="Indicators by Type"
+            subtitle="Breakdown of fraud red-flag categories"
+            loading={state.loadingIndicators}
+            isEmpty={!state.loadingIndicators && indicatorByType.length === 0}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={indicatorByType} dataKey="value" nameKey="name"
+                  cx="50%" cy="50%" innerRadius={55} outerRadius={95} paddingAngle={2}>
+                  {indicatorByType.map((_, i) => (
+                    <Cell key={i} fill={CHART_PALETTE[i % CHART_PALETTE.length]} />
+                  ))}
+                </Pie>
+                <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                <RTooltip contentStyle={{ background: 'var(--ci-bg-surface)', border: '1px solid var(--ci-border)', borderRadius: 8 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Col>
+
+        <Col xs={24}>
+          <ChartCard
+            title="Indicator Severity Over Time"
+            subtitle="Last 10 triggered dates, stacked by severity"
+            loading={state.loadingIndicators}
+            isEmpty={!state.loadingIndicators && severityTrend.length === 0}
+            height={260}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={severityTrend} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--ci-border)" />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'var(--ci-text-secondary)' }} />
+                <RTooltip contentStyle={{ background: 'var(--ci-bg-surface)', border: '1px solid var(--ci-border)', borderRadius: 8 }} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="HIGH"   stackId="a" fill={CHART_COLORS.danger}  radius={[0, 0, 0, 0]} />
+                <Bar dataKey="MEDIUM" stackId="a" fill={CHART_COLORS.accent2} radius={[0, 0, 0, 0]} />
+                <Bar dataKey="LOW"    stackId="a" fill={CHART_COLORS.warn}    radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Col>
+      </Row>
 
       <Tabs
         items={[
@@ -282,7 +397,3 @@ export default function FraudRiskPage() {
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  header:   { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 },
-  statCard: { borderRadius: 10, border: '1px solid #e2e8f0' },
-};
