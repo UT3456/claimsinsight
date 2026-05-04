@@ -1,13 +1,14 @@
-import { useEffect, useReducer, useCallback } from 'react';
+import { useEffect, useMemo, useReducer, useCallback } from 'react';
 import {
-  Table, Button, Modal, Form, Input, Alert, Tooltip, Popconfirm, Typography,
+  Table, Button, Modal, Form, Input, Alert, Tooltip, Popconfirm, Typography, Dropdown,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import type { MenuProps } from 'antd';
 import { Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import {
-  PageHeader, DataCard, DarkButton, GhostButton, EmptyState,
+  PageHeader, DataCard, DarkButton, GhostButton, EmptyState, Badge, Chip,
 } from '../../components/ui';
 import {
   ingestApi,
@@ -22,6 +23,15 @@ const { Text } = Typography;
  * No dedicated reference screen; follows the same admin pattern as FeedsPage.
  */
 
+/** Time-window options driving the "Recent" filter chip. null = no limit. */
+type WindowKey = '24h' | '7d' | '30d' | 'all';
+const TIME_WINDOWS: { key: WindowKey; label: string; hours: number | null }[] = [
+  { key: '24h', label: 'Last 24 hours', hours: 24      },
+  { key: '7d',  label: 'Last 7 days',   hours: 24 * 7  },
+  { key: '30d', label: 'Last 30 days',  hours: 24 * 30 },
+  { key: 'all', label: 'All time',      hours: null    },
+];
+
 interface State {
   items: RawClaim[];
   loading: boolean;
@@ -29,6 +39,7 @@ interface State {
   modalOpen: boolean;
   submitting: boolean;
   searchClaimId: string;
+  windowKey: WindowKey;
 }
 
 type Action =
@@ -41,7 +52,8 @@ type Action =
   | { type: 'SUBMIT_SUCCESS'; payload: RawClaim }
   | { type: 'SUBMIT_ERROR' }
   | { type: 'DELETE'; payload: number }
-  | { type: 'SET_SEARCH'; payload: string };
+  | { type: 'SET_SEARCH'; payload: string }
+  | { type: 'SET_WINDOW'; payload: WindowKey };
 
 function reducer(s: State, a: Action): State {
   switch (a.type) {
@@ -55,6 +67,7 @@ function reducer(s: State, a: Action): State {
     case 'SUBMIT_ERROR':   return { ...s, submitting: false };
     case 'DELETE':         return { ...s, items: s.items.filter(i => i.rawId !== a.payload) };
     case 'SET_SEARCH':     return { ...s, searchClaimId: a.payload };
+    case 'SET_WINDOW':     return { ...s, windowKey: a.payload };
     default:               return s;
   }
 }
@@ -62,9 +75,35 @@ function reducer(s: State, a: Action): State {
 export default function RawClaimsPage() {
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(reducer, {
-    items: [], loading: false, error: null, modalOpen: false, submitting: false, searchClaimId: '',
+    items: [], loading: false, error: null, modalOpen: false, submitting: false,
+    searchClaimId: '', windowKey: 'all',
   });
   const [form] = Form.useForm();
+
+  const activeWindow = TIME_WINDOWS.find(w => w.key === state.windowKey) ?? TIME_WINDOWS[3];
+
+  // Apply the time-window filter client-side so flipping it is instant.
+  // Newest first — handy regardless of window so the most recent ingest is on top.
+  const filtered = useMemo(() => {
+    const list = activeWindow.hours === null
+      ? state.items
+      : state.items.filter(item => {
+          if (!item.ingestedDate) return false;
+          const ageMs = Date.now() - new Date(item.ingestedDate).getTime();
+          if (Number.isNaN(ageMs)) return false;
+          return ageMs <= activeWindow.hours! * 3_600_000;
+        });
+    return [...list].sort((a, b) =>
+      (b.ingestedDate ?? '').localeCompare(a.ingestedDate ?? '')
+    );
+  }, [state.items, activeWindow.hours]);
+
+  const windowMenu: MenuProps = {
+    items: TIME_WINDOWS.map(w => ({ key: w.key, label: w.label })),
+    selectable: true,
+    selectedKeys: [state.windowKey],
+    onClick: ({ key }) => dispatch({ type: 'SET_WINDOW', payload: key as WindowKey }),
+  };
 
   const load = useCallback(async (claimId?: string) => {
     dispatch({ type: 'START' });
@@ -73,8 +112,11 @@ export default function RawClaimsPage() {
         ? await ingestApi.getByClaim(claimId.trim())
         : await ingestApi.getAll();
       dispatch({ type: 'SUCCESS', payload: data });
-    } catch {
-      dispatch({ type: 'ERROR', payload: 'Failed to load raw claims.' });
+    } catch (err) {
+      // axiosInstance interceptor sets `userMessage`; surface that instead of
+      // a generic string so users see the actual backend reason.
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to load raw claims.';
+      dispatch({ type: 'ERROR', payload: msg });
     }
   }, []);
 
@@ -90,14 +132,24 @@ export default function RawClaimsPage() {
       });
       dispatch({ type: 'SUBMIT_SUCCESS', payload: record });
       form.resetFields();
-    } catch {
+    } catch (err) {
+      // The most common ingest failure is feeding into a non-ACTIVE source —
+      // the BE returns a clear 400 message via InvalidFeedStatusException.
+      // Surface it via the page-level Alert (close modal so user can read it).
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to ingest claim.';
       dispatch({ type: 'SUBMIT_ERROR' });
+      dispatch({ type: 'ERROR', payload: msg });
     }
   };
 
   const handleDelete = async (id: number) => {
-    await ingestApi.delete(id);
-    dispatch({ type: 'DELETE', payload: id });
+    try {
+      await ingestApi.delete(id);
+      dispatch({ type: 'DELETE', payload: id });
+    } catch (err) {
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to delete raw claim.';
+      dispatch({ type: 'ERROR', payload: msg });
+    }
   };
 
   const columns: ColumnsType<RawClaim> = [
@@ -112,11 +164,24 @@ export default function RawClaimsPage() {
       title: 'Claim ID',
       dataIndex: 'claimId',
       key: 'claimId',
-      width: '22%',
+      width: '20%',
       render: (v: string) => (
         <a onClick={() => navigate(`/claims/${v}`)} style={{ fontWeight: 500, color: 'var(--ci-primary)' }}>
           {v}
         </a>
+      ),
+    },
+    {
+      title: 'Source feed',
+      key: 'feed',
+      width: 160,
+      render: (_, rec) => (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <Badge tone="blue">{rec.feedType ?? '—'}</Badge>
+          <span style={{ color: 'var(--ci-text-muted)', fontSize: 11 }}>
+            #{rec.feedId}
+          </span>
+        </span>
       ),
     },
     {
@@ -152,7 +217,11 @@ export default function RawClaimsPage() {
     <div>
       <PageHeader
         title="Raw claims"
-        subtitle={`${state.items.length.toLocaleString()} ingested payload${state.items.length === 1 ? '' : 's'}`}
+        subtitle={
+          activeWindow.hours === null
+            ? `${state.items.length.toLocaleString()} ingested payload${state.items.length === 1 ? '' : 's'}`
+            : `${filtered.length.toLocaleString()} of ${state.items.length.toLocaleString()} payloads · ${activeWindow.label.toLowerCase()}`
+        }
         actions={
           <>
             <div style={styles.search}>
@@ -172,6 +241,11 @@ export default function RawClaimsPage() {
                 />
               )}
             </div>
+            <Dropdown menu={windowMenu} trigger={['click']}>
+              <Chip dropdown active={state.windowKey !== 'all'}>
+                {activeWindow.label}
+              </Chip>
+            </Dropdown>
             <GhostButton onClick={() => load()} icon={<RefreshCw size={12} strokeWidth={1.8} />}>
               Refresh
             </GhostButton>
@@ -190,25 +264,37 @@ export default function RawClaimsPage() {
       )}
 
       <DataCard padding={0}>
-        {!state.loading && state.items.length === 0 && !state.error ? (
+        {!state.loading && filtered.length === 0 && !state.error ? (
           <EmptyState
-            title={state.searchClaimId ? 'No matches' : 'No raw claims yet'}
+            title={
+              state.searchClaimId
+                ? 'No matches'
+                : activeWindow.hours !== null
+                  ? `No claims ingested in the ${activeWindow.label.toLowerCase()}`
+                  : 'No raw claims yet'
+            }
             description={
               state.searchClaimId
-                ? `No ingested payloads for claim “${state.searchClaimId}”.`
-                : 'Ingested payloads from your registered feeds will appear here.'
+                ? `No ingested payloads for claim "${state.searchClaimId}".`
+                : activeWindow.hours !== null
+                  ? state.items.length > 0
+                    ? `${state.items.length} older payload${state.items.length === 1 ? '' : 's'} exist — switch to "All time" to see them.`
+                    : 'Ingested payloads from your registered feeds will appear here.'
+                  : 'Ingested payloads from your registered feeds will appear here.'
             }
             actions={
               state.searchClaimId
                 ? <GhostButton onClick={() => { dispatch({ type: 'SET_SEARCH', payload: '' }); load(); }}>Clear search</GhostButton>
-                : <DarkButton onClick={() => dispatch({ type: 'OPEN_MODAL' })}>Ingest claim</DarkButton>
+                : activeWindow.hours !== null && state.items.length > 0
+                  ? <GhostButton onClick={() => dispatch({ type: 'SET_WINDOW', payload: 'all' })}>Show all time</GhostButton>
+                  : <DarkButton onClick={() => dispatch({ type: 'OPEN_MODAL' })}>Ingest claim</DarkButton>
             }
           />
         ) : (
           <Table
             rowKey="rawId"
             columns={columns}
-            dataSource={state.items}
+            dataSource={filtered}
             loading={state.loading}
             pagination={{ pageSize: 10, size: 'small', hideOnSinglePage: true }}
             size="small"

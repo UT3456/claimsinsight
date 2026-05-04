@@ -85,7 +85,7 @@ export default function RegisterPage() {
       setTimeout(() => navigate('/login'), 2000);
     } catch (err: unknown) {
       const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        (err as { userMessage?: string }).userMessage
         ?? 'Registration failed. Username or email may already be taken.';
       setApiError(msg);
     } finally {

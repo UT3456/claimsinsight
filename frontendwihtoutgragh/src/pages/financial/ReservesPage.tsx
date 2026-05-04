@@ -2,6 +2,7 @@ import { useEffect, useMemo, useReducer, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Table, Modal, Form, Input, DatePicker, Alert, Tooltip, Popconfirm, Button,
+  App as AntApp,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
@@ -66,11 +67,6 @@ function reducer(s: State, a: Action): State {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmtUSD = (n: number) => `$${n.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
-const fmtUSDShort = (n: number) => {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000)     return `$${(n / 1_000).toFixed(0)}K`;
-  return `$${n}`;
-};
 
 function bucketOf(amount: number): 'LARGE' | 'MID' | 'SMALL' {
   if (amount >= 100_000) return 'LARGE';
@@ -88,6 +84,7 @@ export default function ReservesPage() {
     search: '', bucketFilter: 'ALL',
   });
   const [form] = Form.useForm();
+  const { message } = AntApp.useApp();
 
   const load = useCallback(async () => {
     dispatch({ type: 'FETCH_START' });
@@ -113,7 +110,12 @@ export default function ReservesPage() {
       };
       dispatch({ type: 'SUBMIT_SUCCESS', payload: await reservesApi.create(req) });
       form.resetFields();
-    } catch { dispatch({ type: 'SUBMIT_ERROR' }); }
+      message.success('Reserve added');
+    } catch (err) {
+      dispatch({ type: 'SUBMIT_ERROR' });
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to add reserve.';
+      message.error(msg);
+    }
   };
 
   const handleDelete = async (id: number) => {

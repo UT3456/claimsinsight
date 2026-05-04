@@ -12,6 +12,10 @@ export interface DataFeed {
 export interface RawClaim {
   rawId: number;
   claimId: string;
+  /** Source feed FK — backend returns this on every IngestionResponseDTO. */
+  feedId: number;
+  /** Source feed type (CLAIM | POLICY | PAYMENT | RESERVE) — denormalized by the BE mapper. */
+  feedType: string;
   payloadJson: string;
   ingestedDate: string;
 }

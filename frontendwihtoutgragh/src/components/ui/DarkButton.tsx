@@ -33,12 +33,14 @@ export default function DarkButton({
 }
 
 const base: React.CSSProperties = {
+  // High-contrast inverted button. Uses CSS variables so the page's foreground
+  // becomes the button's background — works in both light and dark themes.
   display: 'inline-flex', alignItems: 'center', gap: 6,
   borderRadius: 'var(--ci-radius-btn)',
   fontSize: 11, fontWeight: 500, lineHeight: 1.3,
-  background: '#2C2C2A',
-  border: '1px solid #2C2C2A',
-  color: '#ffffff',
+  background: 'var(--ci-text-primary)',
+  border: '1px solid var(--ci-text-primary)',
+  color: 'var(--ci-bg-app)',
   cursor: 'pointer',
 };
 const disabledStyle: React.CSSProperties = { opacity: 0.5, cursor: 'not-allowed' };

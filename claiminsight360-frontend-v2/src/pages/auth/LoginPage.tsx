@@ -52,8 +52,10 @@ export default function LoginPage() {
       dispatch(setCredentials(response));
       navigate('/dashboard', { replace: true });
     } catch (err: unknown) {
+      // axiosInstance interceptor attaches a normalized `userMessage` derived
+      // from whichever error envelope the backend service emits.
       const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        (err as { userMessage?: string }).userMessage
         ?? 'Invalid username or password. Please try again.';
       setApiError(msg);
     } finally {

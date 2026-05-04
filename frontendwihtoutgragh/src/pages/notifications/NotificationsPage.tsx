@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useReducer, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Table, Modal, Form, Input, Select, Alert, Tooltip, Popconfirm, Button,
+  Table, Modal, Form, Input, Select, Alert, Tooltip, Popconfirm, Button, Dropdown,
   App as AntApp,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import type { MenuProps } from 'antd';
 import { useSelector } from 'react-redux';
 import { RefreshCw, Plus, Trash2, Check, CheckCheck, Bell, Search } from 'lucide-react';
 
@@ -172,9 +173,10 @@ export default function NotificationsPage() {
       dispatch({ type: 'SUBMIT_SUCCESS', payload: await notificationsApi.create(req) });
       form.resetFields();
       message.success('Notification sent');
-    } catch {
+    } catch (err) {
       dispatch({ type: 'SUBMIT_ERROR' });
-      message.error('Failed to send notification');
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to send notification';
+      message.error(msg);
     }
   };
 
@@ -318,8 +320,24 @@ export default function NotificationsPage() {
     },
   ];
 
-  const catCycle: (string | null)[]    = [null, ...NOTIFICATION_CATEGORIES];
-  const statusCycle: (string | null)[] = [null, ...NOTIFICATION_STATUSES];
+  const categoryMenu: MenuProps = {
+    items: [
+      { key: '__ALL__', label: 'All categories' },
+      ...NOTIFICATION_CATEGORIES.map(c => ({ key: c, label: c })),
+    ],
+    selectable: true,
+    selectedKeys: [state.filterCategory ?? '__ALL__'],
+    onClick: ({ key }) => dispatch({ type: 'SET_CATEGORY', payload: key === '__ALL__' ? null : key }),
+  };
+  const statusMenu: MenuProps = {
+    items: [
+      { key: '__ALL__', label: 'All statuses' },
+      ...NOTIFICATION_STATUSES.map(s => ({ key: s, label: s })),
+    ],
+    selectable: true,
+    selectedKeys: [state.filterStatus ?? '__ALL__'],
+    onClick: ({ key }) => dispatch({ type: 'SET_STATUS', payload: key === '__ALL__' ? null : key }),
+  };
 
   return (
     <div>
@@ -332,26 +350,16 @@ export default function NotificationsPage() {
         }
         actions={
           <>
-            <Chip
-              dropdown
-              active={!!state.filterCategory}
-              onClick={() => {
-                const i = catCycle.indexOf(state.filterCategory);
-                dispatch({ type: 'SET_CATEGORY', payload: catCycle[(i + 1) % catCycle.length] });
-              }}
-            >
-              {state.filterCategory ?? 'All categories'}
-            </Chip>
-            <Chip
-              dropdown
-              active={!!state.filterStatus}
-              onClick={() => {
-                const i = statusCycle.indexOf(state.filterStatus);
-                dispatch({ type: 'SET_STATUS', payload: statusCycle[(i + 1) % statusCycle.length] });
-              }}
-            >
-              {state.filterStatus ?? 'All statuses'}
-            </Chip>
+            <Dropdown menu={categoryMenu} trigger={['click']}>
+              <Chip dropdown active={!!state.filterCategory}>
+                {state.filterCategory ?? 'All categories'}
+              </Chip>
+            </Dropdown>
+            <Dropdown menu={statusMenu} trigger={['click']}>
+              <Chip dropdown active={!!state.filterStatus}>
+                {state.filterStatus ?? 'All statuses'}
+              </Chip>
+            </Dropdown>
             <GhostButton
               icon={<CheckCheck size={12} strokeWidth={1.8} />}
               onClick={handleMarkAllRead}

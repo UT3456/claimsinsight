@@ -15,25 +15,8 @@
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="false">
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.38/lombok-1.18.38.jar" />
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.38/lombok-1.18.38.jar" />
         </processorPath>
-        <module name="claims-metrics-service" />
         <module name="cost-reserve-service" />
-        <module name="AdjusterAndOperations (1)" />
-        <module name="AdjusterAndOperations" />
-        <module name="fraud-risk-service" />
-      </profile>
-      <profile name="Annotation profile for fraud-risk-service" enabled="true">
-        <sourceOutputDir name="target/generated-sources/annotations" />
-        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
-        <outputRelativeToContentRoot value="true" />
-        <processorPath useClasspath="false">
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
-        </processorPath>
-        <module name="fraud-risk-service (1)" />
-        <module name="data-ingestion-service" />
-        <module name="api-gateway" />
       </profile>
       <profile name="Annotation profile for analytics-report-service" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
@@ -44,7 +27,50 @@
         </processorPath>
         <module name="analytics-report-service" />
       </profile>
+      <profile name="Annotation profile for AdjusterAndOperations" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.38/lombok-1.18.38.jar" />
+        </processorPath>
+        <module name="AdjusterAndOperations" />
+      </profile>
+      <profile name="Annotation profile for ClaimInsight360 — Aggregator" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
+        </processorPath>
+        <module name="api-gateway" />
+        <module name="claims-metrics-service" />
+        <module name="AdjusterAndOperations (1)" />
+        <module name="data-ingestion-service" />
+      </profile>
+      <profile name="Annotation profile for denial-leakage-service" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.38/lombok-1.18.38.jar" />
+        </processorPath>
+        <module name="denial-leakage-service" />
+      </profile>
+      <profile name="Annotation profile for fraud-risk-service" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
+        </processorPath>
+        <module name="fraud-risk-service" />
+      </profile>
     </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="fraud-risk-service (1)" target="24" />
+    </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
@@ -55,6 +81,7 @@
       <module name="claims-metrics-service" options="-parameters -parameters" />
       <module name="cost-reserve-service" options="-parameters" />
       <module name="data-ingestion-service" options="-parameters" />
+      <module name="denial-leakage-service" options="-parameters" />
       <module name="eureka-server" options="-parameters" />
       <module name="fraud-risk-service" options="-parameters" />
       <module name="fraud-risk-service (1)" options="-parameters" />

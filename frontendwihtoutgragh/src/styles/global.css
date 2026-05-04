@@ -59,6 +59,14 @@ body {
   --ci-info-bg:        #E6F1FB;
   --ci-info-text:      #0C447C;
 
+  /* Brand-decorative tones — used by Badge / TintedAvatar / Chip */
+  --ci-purple-bg:      #EEEBF9;
+  --ci-purple-text:    #3B2E7F;
+  --ci-teal-bg:        #E0F2EC;
+  --ci-teal-text:      #084D3D;
+  --ci-neutral-bg:     #EFEDE6;
+  --ci-neutral-text:   #5F5E5A;
+
   /* Back-compat aliases (existing code references these) */
   --ci-accent-success: #27500A;
   --ci-accent-warn:    #633806;
@@ -117,6 +125,14 @@ body {
   --ci-danger-text:    #E8A0A0;
   --ci-info-bg:        #1C2E42;
   --ci-info-text:      #AED1F0;
+
+  /* Brand-decorative tones — dark variants */
+  --ci-purple-bg:      #2A2540;
+  --ci-purple-text:    #C7BEF0;
+  --ci-teal-bg:        #163029;
+  --ci-teal-text:      #80D4B5;
+  --ci-neutral-bg:     #33332F;
+  --ci-neutral-text:   #B4B2A9;
 
   --ci-accent-success: #A7D07F;
   --ci-accent-warn:    #E6B86B;

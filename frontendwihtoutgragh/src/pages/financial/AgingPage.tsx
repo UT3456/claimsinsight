@@ -2,6 +2,7 @@ import { useEffect, useReducer, useCallback } from 'react';
 import {
   Table, Button, Modal, Form, Input, Select, Typography,
   Space, Tag, Alert, Tooltip, Popconfirm, Card, Row, Col, Statistic,
+  App as AntApp,
 } from 'antd';
 import { PlusOutlined, ReloadOutlined, DeleteOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
@@ -72,6 +73,7 @@ export default function AgingPage() {
     items: [], loading: false, error: null, modalOpen: false, submitting: false, filterBucket: null,
   });
   const [form] = Form.useForm();
+  const { message } = AntApp.useApp();
 
   const load = useCallback(async () => {
     dispatch({ type: 'FETCH_START' });
@@ -98,8 +100,11 @@ export default function AgingPage() {
       const record = await agingApi.create(req);
       dispatch({ type: 'SUBMIT_SUCCESS', payload: record });
       form.resetFields();
-    } catch {
+      message.success('Aging record added');
+    } catch (err) {
       dispatch({ type: 'SUBMIT_ERROR' });
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to add aging record.';
+      message.error(msg);
     }
   };
 
@@ -163,12 +168,12 @@ export default function AgingPage() {
       <Row gutter={16} style={{ marginBottom: 24 }}>
         {AGING_BUCKETS.map(b => (
           <Col xs={12} sm={6} key={b}>
-            <Card style={{ borderRadius: 10, border: `1px solid`, borderColor: BUCKET_COLORS[b] === 'red' ? '#fecaca' : '#e2e8f0' }}>
+            <Card style={{ borderRadius: 10, border: `1px solid`, borderColor: BUCKET_COLORS[b] === 'red' ? 'var(--ci-danger-bg)' : 'var(--ci-border)' }}>
               <Statistic
                 title={<Tag color={BUCKET_COLORS[b]}>{AGING_BUCKET_LABELS[b]}</Tag>}
                 value={bucketCounts[b] ?? 0}
                 prefix={<ClockCircleOutlined />}
-                valueStyle={{ color: BUCKET_COLORS[b] === 'red' ? '#dc2626' : BUCKET_COLORS[b] === 'orange' ? '#d97706' : undefined }}
+                valueStyle={{ color: BUCKET_COLORS[b] === 'red' ? 'var(--ci-danger-text)' : BUCKET_COLORS[b] === 'orange' ? 'var(--ci-warning-text)' : undefined }}
               />
             </Card>
           </Col>

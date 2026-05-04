@@ -151,14 +151,14 @@
     <build>
         <plugins>
 
-            <!-- Compiler — Java 24 -->
+            <!-- Compiler — Java 21, matching <java.version> property and the rest of the platform -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
-                    <source>24</source>
-                    <target>24</target>
-                    <release>24</release>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <release>${java.version}</release>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>
@@ -188,7 +188,7 @@
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <version>3.6.3</version>
                 <configuration>
-                    <source>24</source>
+                    <source>${java.version}</source>
                 </configuration>
             </plugin>
 

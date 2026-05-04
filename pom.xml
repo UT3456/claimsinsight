@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    ClaimInsight360 — Maven aggregator (root pom)
+
+    Purpose: tell IntelliJ + Maven that the 10 sibling Spring Boot services
+    are part of one project, so the IDE can discover them as modules and the
+    run configurations under .idea/runConfigurations/ resolve their target
+    `<module name="…">` references correctly.
+
+    This is an AGGREGATOR-ONLY pom (packaging=pom, no <parent> imposed on
+    children). Each child still has its own spring-boot-starter-parent and
+    builds independently — `mvn -pl <module>` works exactly as before.
+
+    Bring it in:
+      1. IntelliJ → File → Open → select this pom.xml → "Open as Project"
+         (or if already open: right-click pom.xml → "Add as Maven Project")
+      2. Maven tool window → click "Reload All Maven Projects"
+      3. The 10 services appear as modules. Now the run configs in
+         .idea/runConfigurations/*.xml resolve their `<module name="…">`
+         references and you can launch each service from the gutter or the
+         "Edit Configurations…" menu.
+
+    Service ports (for reference):
+      8761  eureka-server          — service registry; START FIRST
+      8086  api-gateway            — public ingress; START SECOND
+      8082  data-ingestion-service
+      8083  claims-metrics-service
+      8084  analytics-report-service
+      8085  denial-leakage-service
+      8087  AdjusterAndOperations
+      8088  NotificationService
+      8089  cost-reserve-service
+      8090  fraud-risk-service
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.claiminsight</groupId>
+    <artifactId>claiminsight360-aggregator</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+
+    <name>ClaimInsight360 — Aggregator</name>
+    <description>
+        Aggregator-only root for the ClaimInsight360 microservice mesh.
+        Lists the 10 sibling Spring Boot modules so IntelliJ can discover
+        them in one shot. Each child has its own spring-boot-starter-parent
+        and builds independently.
+    </description>
+
+    <modules>
+        <!-- Start first: discovery -->
+        <module>eureka-server</module>
+
+        <!-- Edge: routing + auth -->
+        <module>api-gateway</module>
+
+        <!-- Business services (any order, all register with Eureka) -->
+        <module>data-ingestion-service</module>
+        <module>claims-metrics-service</module>
+        <module>analytics-report-service</module>
+        <module>denial-leakage-service</module>
+        <module>fraud-risk-service</module>
+        <module>cost-reserve-service</module>
+        <module>NotificationService</module>
+        <module>AdjusterAndOperations</module>
+    </modules>
+</project>

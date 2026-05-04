@@ -22,7 +22,7 @@ export interface EmptyStateProps {
 export default function EmptyState({
   title, description, icon, tone = 'neutral', actions, style,
 }: EmptyStateProps) {
-  const iconBg = tone === 'positive' ? 'var(--ci-success-bg)' : '#EFEDE6';
+  const iconBg = tone === 'positive' ? 'var(--ci-success-bg)' : 'var(--ci-neutral-bg)';
   const iconFg = tone === 'positive' ? 'var(--ci-success-text)' : 'var(--ci-text-muted)';
 
   return (

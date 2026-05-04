@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { store }            from '../store';
 import { clearCredentials } from '../store/slices/authSlice';
 
@@ -24,15 +24,43 @@ axiosInstance.interceptors.request.use((config) => {
   return config;
 });
 
-// ── Response interceptor — handle 401 / 403 / 5xx ──────────────────────────
+/**
+ * Pull a human-readable message out of any error shape the platform emits.
+ * Backend services use one of two envelopes:
+ *   { timestamp, status, error, message }   (most services)
+ *   { success, message, data }              (NotificationService)
+ * Network failures and unknown shapes fall back gracefully.
+ */
+export function getApiErrorMessage(err: unknown): string {
+  const ax = err as AxiosError<any>;
+  if (ax?.response?.data) {
+    const d = ax.response.data;
+    if (typeof d === 'string') return d;
+    if (typeof d.message === 'string' && d.message) return d.message;
+    if (typeof d.error === 'string' && d.error) return d.error;
+  }
+  if (ax?.code === 'ECONNABORTED') return 'Request timed out — the server is taking too long to respond.';
+  if (ax?.message === 'Network Error') return 'Cannot reach the server. Check your connection or the gateway.';
+  return ax?.message || 'Something went wrong.';
+}
+
+// ── Response interceptor — normalize errors, handle auth ───────────────────
 axiosInstance.interceptors.response.use(
   (response) => response,
-  (error) => {
+  (error: AxiosError) => {
     const status = error.response?.status;
+
     if (status === 401) {
       store.dispatch(clearCredentials());
-      window.location.href = '/login';
+      // Avoid redirect loop if we're already on /login
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
     }
+
+    // Attach a normalized message so call sites can do `err.userMessage`
+    // without re-implementing the shape lookup every time.
+    (error as any).userMessage = getApiErrorMessage(error);
     return Promise.reject(error);
   },
 );

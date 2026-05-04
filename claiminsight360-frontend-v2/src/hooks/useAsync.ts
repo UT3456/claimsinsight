@@ -56,8 +56,11 @@ export function useAsync<T>() {
       dispatch({ type: 'FETCH_SUCCESS', payload: data });
       return data;
     } catch (err: unknown) {
+      // axiosInstance attaches a normalized `userMessage` derived from any
+      // error envelope the backend emits. Prefer that; fall back to native
+      // Error.message for non-axios errors (e.g. throw inside a .then).
       const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        (err as { userMessage?: string }).userMessage ??
         (err as Error)?.message ??
         'An error occurred';
       dispatch({ type: 'FETCH_ERROR', payload: msg });

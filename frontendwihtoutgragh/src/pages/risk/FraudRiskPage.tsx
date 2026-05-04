@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useReducer, useCallback } from 'react';
 import {
   Table, Modal, Form, Input, Select, DatePicker, Alert, Tooltip, Popconfirm, Button, Dropdown,
+  App as AntApp,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { MenuProps } from 'antd';
@@ -136,6 +137,7 @@ export default function FraudRiskPage() {
   const [state, dispatch] = useReducer(reducer, initial);
   const [scoreForm]     = Form.useForm();
   const [indicatorForm] = Form.useForm();
+  const { message } = AntApp.useApp();
 
   const loadScores = useCallback(async () => {
     dispatch({ type: 'SCORES_START' });
@@ -161,7 +163,12 @@ export default function FraudRiskPage() {
       };
       dispatch({ type: 'SCORE_CREATED', payload: await riskScoresApi.create(req) });
       scoreForm.resetFields();
-    } catch { dispatch({ type: 'SUBMIT_ERROR' }); }
+      message.success('Risk score added');
+    } catch (err) {
+      dispatch({ type: 'SUBMIT_ERROR' });
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to add risk score.';
+      message.error(msg);
+    }
   };
 
   const handleCreateIndicator = async (values: Record<string, unknown>) => {
@@ -175,7 +182,12 @@ export default function FraudRiskPage() {
       };
       dispatch({ type: 'INDICATOR_CREATED', payload: await riskIndicatorsApi.create(req) });
       indicatorForm.resetFields();
-    } catch { dispatch({ type: 'SUBMIT_ERROR' }); }
+      message.success('Risk indicator added');
+    } catch (err) {
+      dispatch({ type: 'SUBMIT_ERROR' });
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to add risk indicator.';
+      message.error(msg);
+    }
   };
 
   // ── Derived ───────────────────────────────────────────────────────────────
@@ -227,22 +239,31 @@ export default function FraudRiskPage() {
     return map;
   }, [state.indicators]);
 
-  // ── Filter chip cycling ──────────────────────────────────────────────────
+  // ── Filter chip menus ────────────────────────────────────────────────────
 
-  const cycleScore = () => {
-    const order: FilterScore[] = ['GTE_70', 'GTE_85', 'CRITICAL', 'ALL'];
-    const next = order[(order.indexOf(state.filterScore) + 1) % order.length];
-    dispatch({ type: 'SET_FS', payload: next });
+  const scoreMenu: MenuProps = {
+    items: (['GTE_70', 'GTE_85', 'CRITICAL', 'ALL'] as FilterScore[]).map(k => ({
+      key: k, label: SCORE_FILTER_LABEL[k],
+    })),
+    selectable: true,
+    selectedKeys: [state.filterScore],
+    onClick: ({ key }) => dispatch({ type: 'SET_FS', payload: key as FilterScore }),
   };
-  const cycleIndicator = () => {
-    const order: FilterIndicator[] = ['ALL', ...INDICATOR_TYPES];
-    const next = order[(order.indexOf(state.filterIndicator) + 1) % order.length];
-    dispatch({ type: 'SET_FI', payload: next });
+  const indicatorMenu: MenuProps = {
+    items: (['ALL', ...INDICATOR_TYPES] as FilterIndicator[]).map(k => ({
+      key: k, label: k === 'ALL' ? 'All indicators' : k,
+    })),
+    selectable: true,
+    selectedKeys: [state.filterIndicator],
+    onClick: ({ key }) => dispatch({ type: 'SET_FI', payload: key as FilterIndicator }),
   };
-  const cyclePeriod = () => {
-    const order: FilterPeriod[] = ['D7', 'D30', 'D90'];
-    const next = order[(order.indexOf(state.filterPeriod) + 1) % order.length];
-    dispatch({ type: 'SET_FP', payload: next });
+  const periodMenu: MenuProps = {
+    items: (['D7', 'D30', 'D90'] as FilterPeriod[]).map(k => ({
+      key: k, label: PERIOD_LABEL[k],
+    })),
+    selectable: true,
+    selectedKeys: [state.filterPeriod],
+    onClick: ({ key }) => dispatch({ type: 'SET_FP', payload: key as FilterPeriod }),
   };
 
   // ── Add menu (admin actions) ─────────────────────────────────────────────
@@ -317,15 +338,21 @@ export default function FraudRiskPage() {
         subtitle={`${highRiskScores.length} active high-risk claims · ${newFlagsCount} new flag${newFlagsCount === 1 ? '' : 's'} (${PERIOD_LABEL[state.filterPeriod].toLowerCase()})`}
         actions={
           <>
-            <Chip dropdown active={state.filterScore !== 'ALL'} onClick={cycleScore}>
-              {SCORE_FILTER_LABEL[state.filterScore]}
-            </Chip>
-            <Chip dropdown active={state.filterIndicator !== 'ALL'} onClick={cycleIndicator}>
-              {state.filterIndicator === 'ALL' ? 'Indicator type' : state.filterIndicator}
-            </Chip>
-            <Chip dropdown onClick={cyclePeriod}>
-              {PERIOD_LABEL[state.filterPeriod]}
-            </Chip>
+            <Dropdown menu={scoreMenu} trigger={['click']}>
+              <Chip dropdown active={state.filterScore !== 'ALL'}>
+                {SCORE_FILTER_LABEL[state.filterScore]}
+              </Chip>
+            </Dropdown>
+            <Dropdown menu={indicatorMenu} trigger={['click']}>
+              <Chip dropdown active={state.filterIndicator !== 'ALL'}>
+                {state.filterIndicator === 'ALL' ? 'Indicator type' : state.filterIndicator}
+              </Chip>
+            </Dropdown>
+            <Dropdown menu={periodMenu} trigger={['click']}>
+              <Chip dropdown>
+                {PERIOD_LABEL[state.filterPeriod]}
+              </Chip>
+            </Dropdown>
           </>
         }
       />
@@ -507,10 +534,15 @@ const styles: Record<string, React.CSSProperties> = {
   },
   barFill: { height: '100%', borderRadius: 4, transition: 'width 0.3s' },
   darkAdd: {
+    // High-contrast inverted button. Uses theme variables so the foreground
+    // color of the page becomes the background of the button — works in
+    // both light (dark btn on light page) and dark (light btn on dark page).
     display: 'inline-flex', alignItems: 'center', gap: 4,
     padding: '5px 10px', borderRadius: 'var(--ci-radius-btn)',
     fontSize: 11, fontWeight: 500,
-    background: '#2C2C2A', border: '1px solid #2C2C2A',
-    color: '#fff', cursor: 'pointer',
+    background: 'var(--ci-text-primary)',
+    border: '1px solid var(--ci-text-primary)',
+    color: 'var(--ci-bg-app)',
+    cursor: 'pointer',
   },
 };

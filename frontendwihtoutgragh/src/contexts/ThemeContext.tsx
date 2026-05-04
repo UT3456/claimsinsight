@@ -19,14 +19,14 @@ const STORAGE_KEY = 'ci360.theme';
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 /**
- * Reads the initial theme in this precedence order:
- *   1. localStorage (explicit user choice)
- *   2. 'light' fallback (the design spec is light-only; OS preference is ignored)
+ * The toggle has been removed from the UI — the app is light-mode only.
+ * We still keep the ThemeContext + the data-theme attribute writer because
+ * AntD's algorithm + every page's CSS-variable consumers depend on it being
+ * set. Any leftover 'dark' value from a previous session is wiped here.
  */
 function resolveInitialTheme(): ThemeMode {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === 'light' || stored === 'dark') return stored;
+    localStorage.removeItem(STORAGE_KEY);
   } catch { /* localStorage may be blocked */ }
   return 'light';
 }

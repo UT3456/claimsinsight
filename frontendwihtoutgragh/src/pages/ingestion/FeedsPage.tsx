@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useReducer, useCallback } from 'react';
 import {
   Table, Button, Modal, Form, Input, Select,
-  Alert, Tooltip, Popconfirm,
+  Alert, Tooltip, Popconfirm, Dropdown,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import type { MenuProps } from 'antd';
 import { RefreshCw, Trash2, Plus } from 'lucide-react';
 
 import {
-  PageHeader, DataCard, Badge, Chip, StatusDot, DarkButton, GhostButton, EmptyState,
+  PageHeader, DataCard, Badge, Chip, StatusDot, DarkButton, GhostButton, EmptyState, ErrorState,
 } from '../../components/ui';
 import type { StatusTone } from '../../components/ui';
 import {
@@ -101,8 +102,9 @@ export default function FeedsPage() {
     try {
       const data = await feedsApi.getAll();
       dispatch({ type: 'SUCCESS', payload: data });
-    } catch {
-      dispatch({ type: 'ERROR', payload: 'Failed to load data feeds.' });
+    } catch (err) {
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to load data feeds.';
+      dispatch({ type: 'ERROR', payload: msg });
     }
   }, []);
 
@@ -114,14 +116,21 @@ export default function FeedsPage() {
       const record = await feedsApi.create(values as { feedType: string; sourceSystem: string; status: string });
       dispatch({ type: 'SUBMIT_SUCCESS', payload: record });
       form.resetFields();
-    } catch {
+    } catch (err) {
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to create feed.';
       dispatch({ type: 'SUBMIT_ERROR' });
+      dispatch({ type: 'ERROR', payload: msg });
     }
   };
 
   const handleDelete = async (id: number) => {
-    await feedsApi.delete(id);
-    dispatch({ type: 'DELETE', payload: id });
+    try {
+      await feedsApi.delete(id);
+      dispatch({ type: 'DELETE', payload: id });
+    } catch (err) {
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to delete feed.';
+      dispatch({ type: 'ERROR', payload: msg });
+    }
   };
 
   const filtered = useMemo(() => {
@@ -211,19 +220,24 @@ export default function FeedsPage() {
         subtitle={`${activeCount} active source${activeCount === 1 ? '' : 's'} · ingestion health`}
         actions={
           <>
-            <Chip
-              dropdown
-              active={state.statusFilter !== 'ALL'}
-              onClick={() => {
-                const next = state.statusFilter === 'ALL' ? 'ACTIVE'
-                           : state.statusFilter === 'ACTIVE' ? 'FAILED'
-                           : state.statusFilter === 'FAILED' ? 'INACTIVE'
-                           : 'ALL';
-                dispatch({ type: 'SET_FILTER', payload: next });
-              }}
+            <Dropdown
+              menu={{
+                items: [
+                  { key: 'ALL',      label: 'All status' },
+                  { key: 'ACTIVE',   label: STATUS_LABELS.ACTIVE.label },
+                  { key: 'INACTIVE', label: STATUS_LABELS.INACTIVE.label },
+                  { key: 'FAILED',   label: STATUS_LABELS.FAILED.label },
+                ],
+                selectable: true,
+                selectedKeys: [state.statusFilter],
+                onClick: ({ key }) => dispatch({ type: 'SET_FILTER', payload: key as State['statusFilter'] }),
+              } satisfies MenuProps}
+              trigger={['click']}
             >
-              {state.statusFilter === 'ALL' ? 'All status' : STATUS_LABELS[state.statusFilter]?.label ?? state.statusFilter}
-            </Chip>
+              <Chip dropdown active={state.statusFilter !== 'ALL'}>
+                {state.statusFilter === 'ALL' ? 'All status' : STATUS_LABELS[state.statusFilter]?.label ?? state.statusFilter}
+              </Chip>
+            </Dropdown>
             <GhostButton onClick={load} icon={<RefreshCw size={12} strokeWidth={1.8} />}>
               Refresh
             </GhostButton>
@@ -242,7 +256,17 @@ export default function FeedsPage() {
       )}
 
       <DataCard padding={0}>
-        {!state.loading && filtered.length === 0 && !state.error ? (
+        {/* Three render branches:
+            1. error + no data       → centered ErrorState with retry button
+            2. no data, no error     → friendly empty state
+            3. otherwise             → the table (also handles in-flight reload of stale data) */}
+        {!state.loading && state.error && filtered.length === 0 ? (
+          <ErrorState
+            title="Couldn't load feeds"
+            message={state.error}
+            onRetry={load}
+          />
+        ) : !state.loading && filtered.length === 0 && !state.error ? (
           <EmptyState
             title={state.statusFilter === 'ALL' ? 'No feeds registered' : `No ${STATUS_LABELS[state.statusFilter]?.label.toLowerCase() ?? 'matching'} feeds`}
             description={

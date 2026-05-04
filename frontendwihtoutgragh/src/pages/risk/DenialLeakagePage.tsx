@@ -2,13 +2,14 @@ import { useEffect, useMemo, useReducer, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Table, Modal, Form, Input, Select, DatePicker, Alert, Popconfirm, Tooltip, Button, Dropdown,
+  App as AntApp,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { RefreshCw, Plus, Trash2, ChevronDown } from 'lucide-react';
 
 import {
-  PageHeader, KpiCard, DataCard, Badge, Chip, StatusDot, GhostButton, DarkButton, EmptyState, CHART,
+  PageHeader, KpiCard, DataCard, Badge, Chip, StatusDot, GhostButton, DarkButton, EmptyState,
 } from '../../components/ui';
 import type { BadgeTone, StatusTone } from '../../components/ui';
 import {
@@ -108,6 +109,7 @@ export default function DenialLeakagePage() {
   const [state, dispatch] = useReducer(reducer, initial);
   const [patternForm] = Form.useForm();
   const [flagForm]    = Form.useForm();
+  const { message } = AntApp.useApp();
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
 
   const loadPatterns = useCallback(async () => {
@@ -137,7 +139,12 @@ export default function DenialLeakagePage() {
       };
       dispatch({ type: 'PATTERN_CREATED', payload: await denialPatternsApi.create(req) });
       patternForm.resetFields();
-    } catch { dispatch({ type: 'SUBMIT_ERROR' }); }
+      message.success('Denial pattern added');
+    } catch (err) {
+      dispatch({ type: 'SUBMIT_ERROR' });
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to add denial pattern.';
+      message.error(msg);
+    }
   };
 
   const handleCreateFlag = async (values: Record<string, unknown>) => {
@@ -151,34 +158,17 @@ export default function DenialLeakagePage() {
       };
       dispatch({ type: 'FLAG_CREATED', payload: await leakageFlagsApi.create(req) });
       flagForm.resetFields();
-    } catch { dispatch({ type: 'SUBMIT_ERROR' }); }
+      message.success('Leakage flag added');
+    } catch (err) {
+      dispatch({ type: 'SUBMIT_ERROR' });
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to add leakage flag.';
+      message.error(msg);
+    }
   };
 
   // ── Derived data ─────────────────────────────────────────────────────────
   const totalLeakage = state.flags.reduce((s, f) => s + (f.estimatedLoss ?? 0), 0);
   const avgLoss = state.flags.length ? totalLeakage / state.flags.length : 0;
-
-  const denialByCode = useMemo(() => (
-    Object.entries(
-      state.patterns.reduce<Record<string, number>>((acc, p) => {
-        acc[p.denialCode] = (acc[p.denialCode] ?? 0) + 1;
-        return acc;
-      }, {}),
-    )
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 8)
-  ), [state.patterns]);
-
-  const leakageByType = useMemo(() => (
-    Object.entries(
-      state.flags.reduce<Record<string, number>>((acc, f) => {
-        acc[f.leakageType] = (acc[f.leakageType] ?? 0) + f.estimatedLoss;
-        return acc;
-      }, {}),
-    ).map(([name, value]) => ({ name, value: Number(value.toFixed(0)) }))
-      .sort((a, b) => b.value - a.value)
-  ), [state.flags]);
 
   const filteredFlags = useMemo(() => (
     state.typeFilter === 'ALL' ? state.flags : state.flags.filter(f => f.leakageType === state.typeFilter)

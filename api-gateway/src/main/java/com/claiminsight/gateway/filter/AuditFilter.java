@@ -56,8 +56,15 @@ public class AuditFilter implements GlobalFilter, Ordered {
         String method   = request.getMethod().name();
         String clientIp = resolveClientIp(request);
 
-        // Skip internal actuator and eureka calls — they're noisy and not useful in audit
-        if (resource.startsWith("/actuator") || resource.startsWith("/eureka")) {
+        // Skip:
+        //  - /actuator and /eureka — internal noise, not useful in audit
+        //  - /api/auth/* — AuthService writes its own richer audit rows
+        //    (LOGIN_SUCCESS, LOGIN_FAILED with reason, REGISTER with role +
+        //    real userId). Without this skip, every login produced 2 rows:
+        //    one from AuthService (rich) + one from this filter (coarse).
+        if (resource.startsWith("/actuator")
+                || resource.startsWith("/eureka")
+                || resource.startsWith("/api/auth/")) {
             return chain.filter(exchange);
         }
 

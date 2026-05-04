@@ -24,15 +24,32 @@ export const NOTIFICATION_CATEGORIES = ['RISK', 'DENIAL', 'COST', 'PERFORMANCE',
 export const NOTIFICATION_STATUSES   = ['UNREAD', 'READ', 'DISMISSED', 'ACTIONED'] as const;
 
 // ── Response wrapper helper ───────────────────────────────────────────────────
-// NotificationService wraps every response: { success, message, data: <payload> }
+// NotificationService wraps every response in an ApiResponse envelope:
+//   { success: boolean, message: string, data: <payload> }
+// Every other service in the platform uses a flat shape, so this helper exists
+// only for the calls in this file.
+//
+// Resilience: if the BE accidentally drops the envelope (or a proxy/middleware
+// reshapes it), we fall through and return the raw response — but we WARN
+// so the developer knows the contract is drifting. Silent fallthrough was the
+// original behaviour and it hid bugs.
 function unwrap<T>(response: unknown): T {
   if (
     response !== null &&
     typeof response === 'object' &&
     'data' in (response as object)
   ) {
-    return (response as { data: T }).data;
+    const env = response as { success?: boolean; message?: string; data: T };
+    // If the envelope explicitly reports failure, log it. The HTTP status
+    // would normally be non-2xx in this case (axios would have thrown),
+    // but defensive code in case BE returns 200 with success:false.
+    if (env.success === false) {
+      console.warn('[notificationsApi] envelope reported success=false:', env.message);
+    }
+    return env.data;
   }
+  console.warn('[notificationsApi] response did not match expected ApiResponse envelope; ' +
+               'returning raw payload. Backend contract may have changed.');
   return response as T;
 }
 

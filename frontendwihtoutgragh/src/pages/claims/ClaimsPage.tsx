@@ -148,9 +148,11 @@ export default function ClaimsPage() {
       dispatch({ type: 'SUBMIT_SUCCESS', payload: record });
       form.resetFields();
       message.success(`KPI added for ${record.claimId}`);
-    } catch {
+    } catch (err) {
       dispatch({ type: 'SUBMIT_ERROR' });
-      message.error('Failed to add KPI. Check the fields and try again.');
+      const msg = (err as { userMessage?: string }).userMessage
+        ?? 'Failed to add KPI. Check the fields and try again.';
+      message.error(msg);
     }
   };
 
@@ -202,8 +204,8 @@ export default function ClaimsPage() {
             style={{ width: 110 }}
             onChange={(v) => updateStatus(rec.claimId, v as ClaimStatus)}
             options={[
-              { value: 'ACTIVE',   label: <span><span style={{ color: '#27500A' }}>●</span> Active</span> },
-              { value: 'INACTIVE', label: <span><span style={{ color: '#888780' }}>●</span> Inactive</span> },
+              { value: 'ACTIVE',   label: <span><span style={{ color: 'var(--ci-success-text)' }}>●</span> Active</span> },
+              { value: 'INACTIVE', label: <span><span style={{ color: 'var(--ci-text-muted)' }}>●</span> Inactive</span> },
             ]}
           />
         );
@@ -239,8 +241,8 @@ export default function ClaimsPage() {
         {[
           { title: 'Total Records',   value: state.items.length },
           { title: 'Unique Claims',   value: uniqueClaims },
-          { title: 'Active Claims',   value: activeClaims,   valueStyle: { color: '#27500A' } },
-          { title: 'Inactive Claims', value: inactiveClaims, valueStyle: { color: '#888780' } },
+          { title: 'Active Claims',   value: activeClaims,   valueStyle: { color: 'var(--ci-success-text)' } },
+          { title: 'Inactive Claims', value: inactiveClaims, valueStyle: { color: 'var(--ci-text-muted)' } },
           { title: 'Average Value',   value: avgValue },
         ].map(c => (
           <Col xs={24} sm={8} lg={4} key={c.title}>

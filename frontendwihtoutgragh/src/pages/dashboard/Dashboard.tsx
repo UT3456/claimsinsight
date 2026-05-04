@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useReducer, useCallback } from 'react';
-import { Alert, Spin } from 'antd';
+import { useEffect, useMemo, useReducer, useCallback, useState } from 'react';
+import { Alert, Dropdown, Spin } from 'antd';
+import type { MenuProps } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, RefreshCw } from 'lucide-react';
 
 import {
   PageHeader, KpiCard, DataCard, Chip, DarkButton,
@@ -124,10 +125,21 @@ function groupByWeek(dates: string[]): WeeklyBar[] {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
+/** Time-window options driving the "Last X days" header filter. null = no limit. */
+const TIME_WINDOWS: { key: string; label: string; days: number | null }[] = [
+  { key: '7',   label: 'Last 7 days',  days: 7   },
+  { key: '30',  label: 'Last 30 days', days: 30  },
+  { key: '90',  label: 'Last 90 days', days: 90  },
+  { key: 'all', label: 'All time',     days: null },
+];
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { username } = useAuth();
   const [state, dispatch] = useReducer(reducer, initial);
+  const [windowKey, setWindowKey] = useState<string>('30');
+
+  const activeWindow = TIME_WINDOWS.find(w => w.key === windowKey) ?? TIME_WINDOWS[1];
 
   const load = useCallback(async () => {
     dispatch({ type: 'START' });
@@ -140,11 +152,18 @@ export default function Dashboard() {
         denialPatternsApi.getAll(),
       ]);
 
-      const raw    = rawR.status    === 'fulfilled' ? rawR.value    : [];
+      const rawAll = rawR.status    === 'fulfilled' ? rawR.value    : [];
       const tats   = tatR.status    === 'fulfilled' ? tatR.value    : [];
       const losses = lossR.status   === 'fulfilled' ? lossR.value   : [];
       const risks  = riskR.status   === 'fulfilled' ? riskR.value   : [];
       const dens   = denialR.status === 'fulfilled' ? denialR.value : [];
+
+      // Apply the header time-window filter to claims (the only series with
+      // a usable date field). Aggregate metrics (TAT/loss/risk/denial) are
+      // already pre-aggregated by their backing services so we leave them.
+      const raw = activeWindow.days === null
+        ? rawAll
+        : rawAll.filter(r => daysSince(r.ingestedDate) <= activeWindow.days!);
 
       const aging = bucketAging(raw.map(r => daysSince(r.ingestedDate)));
       const weekly = groupByWeek(raw.map(r => r.ingestedDate));
@@ -184,14 +203,22 @@ export default function Dashboard() {
           denial,
         },
       });
-    } catch {
-      dispatch({ type: 'ERROR', payload: 'Failed to load dashboard data.' });
+    } catch (err) {
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to load dashboard data.';
+      dispatch({ type: 'ERROR', payload: msg });
     }
-  }, []);
+  }, [activeWindow]);
 
   useEffect(() => { load(); }, [load]);
 
   const firstName = useMemo(() => (username ?? 'there').split(/\s|\./)[0], [username]);
+
+  const windowMenu: MenuProps = {
+    items: TIME_WINDOWS.map(w => ({ key: w.key, label: w.label })),
+    selectable: true,
+    selectedKeys: [windowKey],
+    onClick: ({ key }) => setWindowKey(key),
+  };
 
   return (
     <div>
@@ -200,9 +227,12 @@ export default function Dashboard() {
         subtitle={`Portfolio performance · welcome back, ${firstName}`}
         actions={
           <>
-            <Chip dropdown>Last 30 days</Chip>
-            <Chip dropdown>All products</Chip>
-            <DarkButton onClick={load}>Export</DarkButton>
+            <Dropdown menu={windowMenu} trigger={['click']}>
+              <Chip dropdown active={windowKey !== '30'}>{activeWindow.label}</Chip>
+            </Dropdown>
+            <DarkButton onClick={load} icon={<RefreshCw size={12} strokeWidth={1.8} />}>
+              Refresh
+            </DarkButton>
           </>
         }
       />
@@ -305,11 +335,14 @@ export default function Dashboard() {
           ) : (
             state.fraud.map((s) => {
               const isCritical = s.score >= 90;
-              const bg      = isCritical ? '#FCEBEB' : '#FAEEDA';
-              const chipBg  = isCritical ? CHART.red : CHART.amber;
-              const chipFg  = isCritical ? '#ffffff' : '#412402';
-              const titleFg = isCritical ? '#501313' : '#412402';
-              const subFg   = isCritical ? '#791F1F' : '#854F0B';
+              // Use theme variables so the card adapts to dark mode. The chip
+              // (score number) keeps its solid CHART hue + white text — high
+              // contrast in either theme.
+              const bg      = isCritical ? 'var(--ci-danger-bg)'  : 'var(--ci-warning-bg)';
+              const chipBg  = isCritical ? CHART.red              : CHART.amber;
+              const chipFg  = '#ffffff';
+              const titleFg = isCritical ? 'var(--ci-danger-text)'  : 'var(--ci-warning-text)';
+              const subFg   = isCritical ? 'var(--ci-danger-text)'  : 'var(--ci-warning-text)';
               return (
                 <div
                   key={s.claimId}

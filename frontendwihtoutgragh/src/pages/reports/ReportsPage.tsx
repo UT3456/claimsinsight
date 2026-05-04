@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useReducer, useCallback } from 'react';
 import {
   Table, Modal, Form, Input, Select, DatePicker, Alert, Tooltip, Popconfirm, Button, Dropdown,
+  App as AntApp,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import type { MenuProps } from 'antd';
 import dayjs from 'dayjs';
 import { RefreshCw, Plus, Trash2, Download, FileText, FileSpreadsheet, Search, ChevronDown } from 'lucide-react';
 
@@ -214,6 +216,7 @@ export default function ReportsPage() {
     filterScope: null, search: '',
   });
   const [form] = Form.useForm();
+  const { message } = AntApp.useApp();
 
   const load = useCallback(async () => {
     dispatch({ type: 'FETCH_START' });
@@ -240,7 +243,12 @@ export default function ReportsPage() {
       };
       dispatch({ type: 'SUBMIT_SUCCESS', payload: await reportsApi.create(req) });
       form.resetFields();
-    } catch { dispatch({ type: 'SUBMIT_ERROR' }); }
+      message.success('Report generated');
+    } catch (err) {
+      dispatch({ type: 'SUBMIT_ERROR' });
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to generate report.';
+      message.error(msg);
+    }
   };
 
   const handleDelete = async (id: number) => {
@@ -330,17 +338,22 @@ export default function ReportsPage() {
         subtitle={`${state.items.length} report${state.items.length === 1 ? '' : 's'} · ${withDataCount} with payload`}
         actions={
           <>
-            <Chip
-              dropdown
-              active={!!state.filterScope}
-              onClick={() => {
-                const cycle: (string | null)[] = [null, ...REPORT_SCOPES];
-                const i = cycle.indexOf(state.filterScope);
-                dispatch({ type: 'SET_FILTER', payload: cycle[(i + 1) % cycle.length] });
-              }}
+            <Dropdown
+              menu={{
+                items: [
+                  { key: '__ALL__', label: 'All scopes' },
+                  ...REPORT_SCOPES.map(s => ({ key: s, label: s })),
+                ],
+                selectable: true,
+                selectedKeys: [state.filterScope ?? '__ALL__'],
+                onClick: ({ key }) => dispatch({ type: 'SET_FILTER', payload: key === '__ALL__' ? null : key }),
+              } satisfies MenuProps}
+              trigger={['click']}
             >
-              {state.filterScope ?? 'All scopes'}
-            </Chip>
+              <Chip dropdown active={!!state.filterScope}>
+                {state.filterScope ?? 'All scopes'}
+              </Chip>
+            </Dropdown>
             <Dropdown
               trigger={['click']}
               menu={{

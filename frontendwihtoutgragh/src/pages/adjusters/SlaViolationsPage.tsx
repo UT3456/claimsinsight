@@ -2,6 +2,7 @@ import { useEffect, useMemo, useReducer, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Table, Modal, Form, Input, DatePicker, Alert, Row, Col,
+  App as AntApp,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
@@ -76,6 +77,7 @@ export default function SlaViolationsPage() {
     severityFilter: 'ALL', escalatedOnly: false,
   });
   const [form] = Form.useForm();
+  const { message } = AntApp.useApp();
 
   const load = useCallback(async () => {
     dispatch({ type: 'FETCH_START' });
@@ -99,7 +101,12 @@ export default function SlaViolationsPage() {
       };
       dispatch({ type: 'SUBMIT_SUCCESS', payload: await slaApi.create(req) });
       form.resetFields();
-    } catch { dispatch({ type: 'SUBMIT_ERROR' }); }
+      message.success('SLA violation logged');
+    } catch (err) {
+      dispatch({ type: 'SUBMIT_ERROR' });
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to log SLA violation.';
+      message.error(msg);
+    }
   };
 
   // ── Derived ──────────────────────────────────────────────────────────────
@@ -117,18 +124,6 @@ export default function SlaViolationsPage() {
     if (state.escalatedOnly) list = list.filter(i => i.escalated);
     return list;
   }, [state.items, state.severityFilter, state.escalatedOnly]);
-
-  const byType = useMemo(() => (
-    Object.entries(
-      state.items.reduce<Record<string, number>>((acc, v) => {
-        acc[v.violationType] = (acc[v.violationType] ?? 0) + 1;
-        return acc;
-      }, {}),
-    )
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 6)
-  ), [state.items]);
 
   const severityMix = useMemo(() => (
     [

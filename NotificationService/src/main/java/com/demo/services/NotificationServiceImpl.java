@@ -4,7 +4,6 @@ import com.demo.dto.NotificationRequestDTO;
 import com.demo.dto.NotificationResponseDTO;
 import com.demo.dto.NotificationStatusUpdateDTO;
 import com.demo.dto.NotificationDispatchRequestDTO;
-import com.demo.dto.UserSyncRequestDTO;
 import com.demo.entities.*;
 import com.demo.enums.NotificationCategory;
 import com.demo.enums.NotificationStatus;
@@ -114,35 +113,6 @@ public class NotificationServiceImpl implements NotificationService {
                 return created;
         }
 
-    /**
-     * Upsert by explicit userId. We bypass JPA's IDENTITY generation with a native
-     * {@code INSERT ... ON DUPLICATE KEY UPDATE} so the caller's userId is honored
-     * verbatim — the api-gateway owns identity and this table mirrors it.
-     *
-     * <p>MySQL-specific SQL. H2 (test profile) supports {@code MERGE INTO}; because
-     * this path is only exercised against the real users table in prod-like runs,
-     * we keep a single MySQL statement here and rely on H2 being driven through
-     * repository seeding in tests instead.
-     */
-    @Override
-    @Transactional
-    public void syncUser(UserSyncRequestDTO request) {
-        if (request == null || request.getUserId() == null) return;
-        boolean active = request.getIsActive() == null || request.getIsActive();
-        entityManager.createNativeQuery(
-                "INSERT INTO users (user_id, name, email, role, is_active) " +
-                "VALUES (:userId, :name, :email, :role, :active) " +
-                "ON DUPLICATE KEY UPDATE name = VALUES(name), email = VALUES(email), " +
-                "role = VALUES(role), is_active = VALUES(is_active)")
-                .setParameter("userId", request.getUserId())
-                .setParameter("name", request.getName())
-                .setParameter("email", request.getEmail())
-                .setParameter("role", request.getRole())
-                .setParameter("active", active)
-                .executeUpdate();
-        log.info("User sync upsert: userId={}, role={}", request.getUserId(), request.getRole());
-    }
-
     @Override
     @Cacheable(value = "userNotifications", key = "#userId")
     public List<NotificationResponseDTO> getNotificationsForUser(Long userId) {
@@ -224,27 +194,20 @@ public class NotificationServiceImpl implements NotificationService {
                 .getResultList();
 
         for (RiskScore score : highRiskScores) {
+            boolean alreadyAlerted = notificationRepository.existsByReferenceIdAndCategoryAndStatus(
+                    score.getClaimId(), NotificationCategory.RISK, NotificationStatus.UNREAD);
+            if (alreadyAlerted) continue;
+
             String title   = "High Risk Claim Detected — " + score.getClaimId();
             String message = String.format(
                     "Claim %s has a fraud risk score of %d (%s). Immediate review required.",
                     score.getClaimId(), score.getScoreValue(), score.getRiskLevel());
 
-            // Per-user dedup: late-joiners still get their own copy, and we
-            // never double-fire for a user who already has an UNREAD for this claim.
-            boolean fired = false;
             for (User user : fraudUsers) {
-                boolean alreadyAlerted = notificationRepository
-                        .existsByUserIdAndReferenceIdAndCategoryAndStatus(
-                                user.getUserId(), score.getClaimId(),
-                                NotificationCategory.RISK, NotificationStatus.UNREAD);
-                if (alreadyAlerted) continue;
                 saveSystemNotification(user.getUserId(), title, message,
                         NotificationCategory.RISK, score.getClaimId());
-                fired = true;
             }
-            if (fired) {
-                log.warn("RISK alert fired for claim={} score={}", score.getClaimId(), score.getScoreValue());
-            }
+            log.warn("RISK alert fired for claim={} score={}", score.getClaimId(), score.getScoreValue());
         }
     }
 
@@ -280,25 +243,20 @@ public class NotificationServiceImpl implements NotificationService {
             if (violationCount < SLA_VIOLATION_THRESHOLD) continue;
 
             String referenceId = "ADJ-" + adjusterId;
+            boolean alreadyAlerted = notificationRepository.existsByReferenceIdAndCategoryAndStatus(
+                    referenceId, NotificationCategory.PERFORMANCE, NotificationStatus.UNREAD);
+            if (alreadyAlerted) continue;
+
             String title   = "SLA Breach Threshold Exceeded — Adjuster #" + adjusterId;
             String message = String.format(
                     "Adjuster %d has breached SLA on %d claims this month. Threshold is %d. Please review workload.",
                     adjusterId, violationCount, SLA_VIOLATION_THRESHOLD);
 
-            boolean fired = false;
             for (User manager : managers) {
-                boolean alreadyAlerted = notificationRepository
-                        .existsByUserIdAndReferenceIdAndCategoryAndStatus(
-                                manager.getUserId(), referenceId,
-                                NotificationCategory.PERFORMANCE, NotificationStatus.UNREAD);
-                if (alreadyAlerted) continue;
                 saveSystemNotification(manager.getUserId(), title, message,
                         NotificationCategory.PERFORMANCE, referenceId);
-                fired = true;
             }
-            if (fired) {
-                log.warn("PERFORMANCE alert fired for adjusterId={} violations={}", adjusterId, violationCount);
-            }
+            log.warn("PERFORMANCE alert fired for adjusterId={} violations={}", adjusterId, violationCount);
         }
     }
 
@@ -323,26 +281,21 @@ public class NotificationServiceImpl implements NotificationService {
                 .getResultList();
 
         for (AgingRecord record : criticalAging) {
+            boolean alreadyAlerted = notificationRepository.existsByReferenceIdAndCategoryAndStatus(
+                    record.getClaimId(), NotificationCategory.AGING, NotificationStatus.UNREAD);
+            if (alreadyAlerted) continue;
+
             String title   = "Critically Aged Claim — " + record.getClaimId();
             String message = String.format(
                     "Claim %s has been %s for %d days (bucket: %s). Status is still %s. Immediate action required.",
                     record.getClaimId(), record.getStatus(), record.getAgingDays(),
                     record.getAgingBucket(), record.getStatus());
 
-            boolean fired = false;
             for (User analyst : analysts) {
-                boolean alreadyAlerted = notificationRepository
-                        .existsByUserIdAndReferenceIdAndCategoryAndStatus(
-                                analyst.getUserId(), record.getClaimId(),
-                                NotificationCategory.AGING, NotificationStatus.UNREAD);
-                if (alreadyAlerted) continue;
                 saveSystemNotification(analyst.getUserId(), title, message,
                         NotificationCategory.AGING, record.getClaimId());
-                fired = true;
             }
-            if (fired) {
-                log.warn("AGING alert fired for claim={} days={}", record.getClaimId(), record.getAgingDays());
-            }
+            log.warn("AGING alert fired for claim={} days={}", record.getClaimId(), record.getAgingDays());
         }
     }
 

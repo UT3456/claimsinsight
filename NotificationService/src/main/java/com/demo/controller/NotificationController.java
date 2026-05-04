@@ -5,7 +5,6 @@ import com.demo.dto.NotificationDispatchRequestDTO;
 import com.demo.dto.NotificationRequestDTO;
 import com.demo.dto.NotificationResponseDTO;
 import com.demo.dto.NotificationStatusUpdateDTO;
-import com.demo.dto.UserSyncRequestDTO;
 import com.demo.enums.NotificationCategory;
 import com.demo.enums.NotificationStatus;
 //import io.swagger.v3.oas.annotations.Operation;
@@ -30,15 +29,6 @@ public interface NotificationController {
     @PostMapping("/dispatch")
     ResponseEntity<ApiResponse<Long>> dispatchNotification(
             @Valid @RequestBody NotificationDispatchRequestDTO request);
-
-    /**
-     * Upserts a gateway-owned user into this service's mock {@code users} table so
-     * role-targeted dispatch fan-out reaches the same userId the gateway signed
-     * into the caller's JWT. Idempotent.
-     */
-    @PostMapping("/users/sync")
-    ResponseEntity<ApiResponse<String>> syncUser(
-            @Valid @RequestBody UserSyncRequestDTO request);
 
     @GetMapping("/user/{userId}")
     ResponseEntity<ApiResponse<List<NotificationResponseDTO>>> getNotificationsForUser(

@@ -116,7 +116,7 @@ export default function ProfilePage() {
             <div style={styles.avatarSection}>
               <Avatar
                 size={96}
-                style={{ background: '#185FA5', fontSize: 32, fontWeight: 500 }}
+                style={{ background: 'var(--ci-primary)', fontSize: 32, fontWeight: 500 }}
               >
                 {initials}
               </Avatar>
@@ -126,7 +126,7 @@ export default function ProfilePage() {
 
             <Divider />
 
-            <Descriptions column={1} size="small" labelStyle={{ color: '#64748b', fontWeight: 500 }}>
+            <Descriptions column={1} size="small" labelStyle={{ color: 'var(--ci-text-muted)', fontWeight: 500 }}>
               <Descriptions.Item label={<><UserOutlined /> &nbsp;User ID</>}>
                 <Text code>#{userId ?? '—'}</Text>
               </Descriptions.Item>
@@ -153,15 +153,15 @@ export default function ProfilePage() {
               <Row gutter={16}>
                 <Col xs={12} sm={8}>
                   <Statistic title="Total Notifications" value={state.totalNotifications}
-                    valueStyle={{ color: '#2563eb' }} />
+                    valueStyle={{ color: 'var(--ci-primary)' }} />
                 </Col>
                 <Col xs={12} sm={8}>
                   <Statistic title="Unread" value={state.unreadCount}
-                    valueStyle={{ color: state.unreadCount > 0 ? '#dc2626' : '#16a34a' }} />
+                    valueStyle={{ color: state.unreadCount > 0 ? 'var(--ci-danger-text)' : 'var(--ci-success-text)' }} />
                 </Col>
                 <Col xs={12} sm={8}>
                   <Statistic title="Read" value={state.totalNotifications - state.unreadCount}
-                    valueStyle={{ color: '#16a34a' }} />
+                    valueStyle={{ color: 'var(--ci-success-text)' }} />
                 </Col>
               </Row>
             )}
@@ -183,8 +183,8 @@ export default function ProfilePage() {
                 const hasAccess = role ? roles.includes(role) : false;
                 return (
                   <Col xs={24} sm={12} key={label}>
-                    <div style={{ ...styles.permRow, background: hasAccess ? 'rgba(60,179,113,0.08)' : 'rgba(244,91,105,0.08)', border: `1px solid ${hasAccess ? 'rgba(60,179,113,0.35)' : 'rgba(244,91,105,0.35)'}` }}>
-                      <Text style={{ fontSize: 13, color: hasAccess ? '#3CB371' : '#F45B69', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ ...styles.permRow, background: hasAccess ? 'var(--ci-success-bg)' : 'var(--ci-danger-bg)', border: `1px solid ${hasAccess ? 'var(--ci-success-bg)' : 'var(--ci-danger-bg)'}` }}>
+                      <Text style={{ fontSize: 13, color: hasAccess ? 'var(--ci-success-text)' : 'var(--ci-danger-text)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                         {hasAccess ? <FiCheckCircle /> : <FiLock />} {label}
                       </Text>
                     </div>
@@ -201,7 +201,7 @@ export default function ProfilePage() {
 
 const styles: Record<string, React.CSSProperties> = {
   header:        { marginBottom: 24 },
-  card:          { borderRadius: 12, border: '1px solid #e2e8f0' },
+  card:          { borderRadius: 12, border: '1px solid var(--ci-border)' },
   avatarSection: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 0 4px' },
   permRow:       { padding: '8px 14px', borderRadius: 8 },
 };

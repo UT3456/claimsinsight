@@ -6,7 +6,6 @@ import com.demo.dto.NotificationDispatchRequestDTO;
 import com.demo.dto.NotificationRequestDTO;
 import com.demo.dto.NotificationResponseDTO;
 import com.demo.dto.NotificationStatusUpdateDTO;
-import com.demo.dto.UserSyncRequestDTO;
 import com.demo.enums.NotificationCategory;
 import com.demo.enums.NotificationStatus;
 import com.demo.services.NotificationService;
@@ -38,12 +37,6 @@ public class NotificationControllerImpl implements NotificationController {
         long created = notificationService.dispatchNotification(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Notifications dispatched successfully", created));
-    }
-
-    @Override
-    public ResponseEntity<ApiResponse<String>> syncUser(@Valid UserSyncRequestDTO request) {
-        notificationService.syncUser(request);
-        return ResponseEntity.ok(ApiResponse.success("User synced", null));
     }
 
     @Override

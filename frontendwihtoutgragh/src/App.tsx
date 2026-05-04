@@ -2,6 +2,7 @@ import { BrowserRouter }                           from 'react-router-dom';
 import { ConfigProvider, App as AntApp, theme as antdTheme } from 'antd';
 import AppRouter                                   from './router/AppRouter';
 import { ThemeProvider, useTheme }                 from './contexts/ThemeContext';
+import ErrorBoundary                               from './components/common/ErrorBoundary';
 
 /** Inner component so we can consume the ThemeContext created by ThemeProvider. */
 function ThemedApp() {
@@ -53,7 +54,13 @@ function ThemedApp() {
           they pick up the configured theme and sit above the rest of the tree. */}
       <AntApp>
         <BrowserRouter>
-          <AppRouter />
+          {/* ErrorBoundary catches render-time exceptions in any page so a
+              single bad component cannot blank the whole app. Async errors
+              are NOT caught here — those go through the axios interceptor
+              and per-page catch blocks. */}
+          <ErrorBoundary>
+            <AppRouter />
+          </ErrorBoundary>
         </BrowserRouter>
       </AntApp>
     </ConfigProvider>

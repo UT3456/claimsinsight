@@ -138,7 +138,7 @@ export default function NotificationBell() {
                     avatar={
                       <div style={{
                         ...styles.dot,
-                        background: unread ? '#2563eb' : 'transparent',
+                        background: unread ? 'var(--ci-primary)' : 'transparent',
                         border: unread ? 'none' : '1px solid var(--ci-border)',
                       }} />
                     }
@@ -202,7 +202,7 @@ export default function NotificationBell() {
           count={unreadCount}
           overflowCount={99}
           offset={[-2, 2]}
-          style={{ backgroundColor: '#F45B69' }}
+          style={{ backgroundColor: 'var(--ci-chart-red, #E24B4A)' }}
         >
           <div style={styles.bell} aria-label="Open notifications">
             <FiBell style={{ fontSize: 20, color: 'var(--ci-text-secondary)' }} />

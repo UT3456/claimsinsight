@@ -17,9 +17,9 @@ const TONES: Record<BadgeTone, React.CSSProperties> = {
   amber:   { background: 'var(--ci-warning-bg)', color: 'var(--ci-warning-text)' },
   red:     { background: 'var(--ci-danger-bg)',  color: 'var(--ci-danger-text)' },
   blue:    { background: 'var(--ci-info-bg)',    color: 'var(--ci-info-text)' },
-  purple:  { background: '#EEEBF9',              color: '#3B2E7F' },
-  teal:    { background: '#E0F2EC',              color: '#084D3D' },
-  neutral: { background: '#EFEDE6',              color: '#5F5E5A' },
+  purple:  { background: 'var(--ci-purple-bg)',  color: 'var(--ci-purple-text)' },
+  teal:    { background: 'var(--ci-teal-bg)',    color: 'var(--ci-teal-text)' },
+  neutral: { background: 'var(--ci-neutral-bg)', color: 'var(--ci-neutral-text)' },
 };
 
 export default function Badge({ tone = 'neutral', children, style }: BadgeProps) {

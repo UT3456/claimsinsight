@@ -2,7 +2,7 @@ import { useEffect, useReducer, useCallback } from 'react';
 import {
   Table, Button, Modal, Form, Input, Select, DatePicker,
   Typography, Space, Tag, Alert, Tooltip, Popconfirm,
-  Card, Row, Col, Statistic,
+  Card, Row, Col, Statistic, App as AntApp,
 } from 'antd';
 import { PlusOutlined, ReloadOutlined, DeleteOutlined, DollarOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
@@ -62,6 +62,7 @@ export default function CostsPage() {
     items: [], loading: false, error: null, modalOpen: false, submitting: false,
   });
   const [form] = Form.useForm();
+  const { message } = AntApp.useApp();
 
   const load = useCallback(async () => {
     dispatch({ type: 'FETCH_START' });
@@ -87,8 +88,11 @@ export default function CostsPage() {
       const record = await costsApi.create(req);
       dispatch({ type: 'SUBMIT_SUCCESS', payload: record });
       form.resetFields();
-    } catch {
+      message.success('Cost record added');
+    } catch (err) {
       dispatch({ type: 'SUBMIT_ERROR' });
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to add cost record.';
+      message.error(msg);
     }
   };
 
@@ -173,7 +177,7 @@ export default function CostsPage() {
               <Statistic title={t} value={byCostType[t] ?? 0}
                 prefix="$"
                 formatter={v => Number(v).toLocaleString('en-US', { minimumFractionDigits: 0 })}
-                valueStyle={{ color: COST_COLORS[t] === 'red' ? '#dc2626' : undefined, fontSize: 18 }} />
+                valueStyle={{ color: COST_COLORS[t] === 'red' ? 'var(--ci-danger-text)' : undefined, fontSize: 18 }} />
             </Card>
           </Col>
         ))}

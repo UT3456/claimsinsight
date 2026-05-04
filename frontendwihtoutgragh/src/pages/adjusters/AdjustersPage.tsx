@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useReducer, useCallback } from 'react';
 import {
   Table, Modal, Form, Input, Alert, Tooltip, Popconfirm, Button, Row, Col,
+  App as AntApp,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { RefreshCw, Plus, Trash2, Trophy, Search } from 'lucide-react';
@@ -88,6 +89,7 @@ export default function AdjustersPage() {
     period: '', tierFilter: 'ALL', search: '',
   });
   const [form] = Form.useForm();
+  const { message } = AntApp.useApp();
 
   const load = useCallback(async () => {
     dispatch({ type: 'FETCH_START' });
@@ -116,7 +118,12 @@ export default function AdjustersPage() {
       };
       dispatch({ type: 'SUBMIT_SUCCESS', payload: await adjustersApi.create(req) });
       form.resetFields();
-    } catch { dispatch({ type: 'SUBMIT_ERROR' }); }
+      message.success('Adjuster record added');
+    } catch (err) {
+      dispatch({ type: 'SUBMIT_ERROR' });
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to add adjuster record.';
+      message.error(msg);
+    }
   };
 
   const handleDelete = async (id: number) => {
@@ -144,19 +151,6 @@ export default function AdjustersPage() {
     ? (state.items.reduce((s, i) => s + (i.slaComplianceRate ?? 0), 0) / state.items.length)
     : 0;
   const topCount = state.items.filter(i => (i.slaComplianceRate ?? 0) >= 90).length;
-
-  const topAdjusters = useMemo(() => (
-    [...state.items]
-      .sort((a, b) => b.claimsHandled - a.claimsHandled)
-      .slice(0, 10)
-      .map(i => ({
-        name: `#${i.adjusterId}`,
-        adjusterId: i.adjusterId,
-        claims: i.claimsHandled,
-        avgTat: Number((i.avgTat ?? 0).toFixed(1)),
-        slaRate: Number((i.slaComplianceRate ?? 0).toFixed(1)),
-      }))
-  ), [state.items]);
 
   const columns: ColumnsType<AdjusterPerformance> = [
     {

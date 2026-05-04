@@ -6,6 +6,7 @@ export { default as Chip }          from './Chip';
 export { default as StatusDot }     from './StatusDot';
 export { default as TintedAvatar, initialsOf } from './TintedAvatar';
 export { default as EmptyState }    from './EmptyState';
+export { default as ErrorState }    from './ErrorState';
 export { default as GhostButton }   from './GhostButton';
 export { default as DarkButton }    from './DarkButton';
 
@@ -17,6 +18,7 @@ export type { ChipProps }         from './Chip';
 export type { StatusDotProps, StatusTone } from './StatusDot';
 export type { TintedAvatarProps } from './TintedAvatar';
 export type { EmptyStateProps }   from './EmptyState';
+export type { ErrorStateProps }   from './ErrorState';
 export type { GhostButtonProps }  from './GhostButton';
 export type { DarkButtonProps }   from './DarkButton';
 

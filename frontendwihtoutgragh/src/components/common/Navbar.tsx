@@ -1,10 +1,9 @@
 import { Dropdown }  from 'antd';
 import type { MenuProps } from 'antd';
 import { useNavigate }    from 'react-router-dom';
-import { Menu, PanelLeftClose, PanelLeftOpen, Shield, User, LogOut, ChevronDown } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, Shield, User, LogOut, ChevronDown } from 'lucide-react';
 import { useAuth }        from '../../hooks/useAuth';
 import NotificationBell   from './NotificationBell';
-import ThemeToggle        from './ThemeToggle';
 import { TintedAvatar }   from '../ui';
 
 interface NavbarProps {
@@ -65,7 +64,6 @@ export default function Navbar({ collapsed, onToggle }: NavbarProps) {
 
       {/* Right */}
       <div style={styles.right}>
-        <ThemeToggle />
         <NotificationBell />
 
         <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
