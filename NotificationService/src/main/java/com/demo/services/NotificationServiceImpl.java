@@ -10,10 +10,17 @@ import com.demo.enums.NotificationStatus;
 import com.demo.enums.UserRole;
 import com.demo.exception.NotificationNotFoundException;
 import com.demo.repository.NotificationRepository;
+import com.demo.client.FraudRiskServiceClient;
+import com.demo.client.AdjusterOperationsClient;
+import com.demo.client.CostReserveAgingClient;
+import com.demo.client.dto.RiskScoreDTO;
+import com.demo.client.dto.SLAViolationDTO;
+import com.demo.client.dto.AgingRecordDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +31,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -36,6 +44,18 @@ public class NotificationServiceImpl implements NotificationService {
 
     @PersistenceContext
     private EntityManager entityManager;
+
+    /** Optional: null when fraud-risk-service is unreachable. Alerts are non-blocking. */
+    @Autowired(required = false)
+    private FraudRiskServiceClient fraudRiskServiceClient;
+
+    /** Optional: null when AdjusterAndOperations is unreachable. Alerts are non-blocking. */
+    @Autowired(required = false)
+    private AdjusterOperationsClient adjusterOperationsClient;
+
+    /** Optional: null when cost-reserve-service is unreachable. Alerts are non-blocking. */
+    @Autowired(required = false)
+    private CostReserveAgingClient costReserveAgingClient;
 
     private static final int  RISK_SCORE_THRESHOLD   = 61;
 
@@ -176,32 +196,42 @@ public class NotificationServiceImpl implements NotificationService {
     }
     /**
      * RISK ALERT — runs every 5 minutes.
-     * **/
+     * Fetches high-risk scores directly from fraud-risk-service via Feign.
+     * Skips silently if the client is unavailable (service down or not yet registered).
+     */
     @Override
     @Scheduled(fixedDelay = 300_000)   // every 5 minutes
     @Transactional
     public void generateRiskAlerts() {
         log.debug("Scheduler running: generateRiskAlerts");
-
-        List<RiskScore> highRiskScores = entityManager
-                .createQuery("SELECT r FROM RiskScore r WHERE r.scoreValue >= :threshold", RiskScore.class)
-                .setParameter("threshold", RISK_SCORE_THRESHOLD)
-                .getResultList();
+        if (fraudRiskServiceClient == null) {
+            log.debug("FraudRiskServiceClient unavailable — skipping risk alert scan");
+            return;
+        }
+        List<RiskScoreDTO> highRiskScores;
+        try {
+            highRiskScores = fraudRiskServiceClient.getRiskScoresAboveThreshold((double) RISK_SCORE_THRESHOLD);
+        } catch (Exception e) {
+            log.warn("Could not fetch risk scores from fraud-risk-service: {}", e.getMessage());
+            return;
+        }
 
         List<User> fraudUsers = entityManager
                 .createQuery("SELECT u FROM User u WHERE u.role = :role AND u.isActive = true", User.class)
                 .setParameter("role", UserRole.FRAUD)
                 .getResultList();
 
-        for (RiskScore score : highRiskScores) {
+        for (RiskScoreDTO score : highRiskScores) {
             boolean alreadyAlerted = notificationRepository.existsByReferenceIdAndCategoryAndStatus(
                     score.getClaimId(), NotificationCategory.RISK, NotificationStatus.UNREAD);
             if (alreadyAlerted) continue;
 
+            String riskLabel = score.getScoreValue() >= 80.0 ? "HIGH"
+                    : score.getScoreValue() >= 60.0 ? "MEDIUM" : "LOW";
             String title   = "High Risk Claim Detected — " + score.getClaimId();
             String message = String.format(
-                    "Claim %s has a fraud risk score of %d (%s). Immediate review required.",
-                    score.getClaimId(), score.getScoreValue(), score.getRiskLevel());
+                    "Claim %s has a fraud risk score of %.1f (%s). Immediate review required.",
+                    score.getClaimId(), score.getScoreValue(), riskLabel);
 
             for (User user : fraudUsers) {
                 saveSystemNotification(user.getUserId(), title, message,
@@ -213,33 +243,43 @@ public class NotificationServiceImpl implements NotificationService {
 
     /**
      * PERFORMANCE ALERT — runs every 10 minutes.
+     * Fetches all SLA violations from AdjusterAndOperations via Feign, then
+     * groups by adjusterId filtering to the current month in memory.
+     * Skips silently if the client is unavailable.
      */
     @Override
     @Scheduled(fixedDelay = 600_000)   // every 10 minutes
     @Transactional
     public void generatePerformanceAlerts() {
         log.debug("Scheduler running: generatePerformanceAlerts");
+        if (adjusterOperationsClient == null) {
+            log.debug("AdjusterOperationsClient unavailable — skipping performance alert scan");
+            return;
+        }
+        List<SLAViolationDTO> allViolations;
+        try {
+            allViolations = adjusterOperationsClient.getAllViolations();
+        } catch (Exception e) {
+            log.warn("Could not fetch SLA violations from AdjusterAndOperations: {}", e.getMessage());
+            return;
+        }
 
         LocalDate startOfMonth = LocalDate.now().withDayOfMonth(1);
 
-        // Get adjuster IDs with violations this month
-        List<Long> adjusterIds = entityManager
-                .createQuery("SELECT DISTINCT s.adjusterId FROM SlaViolation s WHERE s.violationDate >= :start", Long.class)
-                .setParameter("start", startOfMonth)
-                .getResultList();
+        // Group violations by adjusterId, scoped to the current month.
+        // violationDate null-safe: include the record if the date cannot be determined.
+        Map<Long, Long> violationCounts = allViolations.stream()
+                .filter(v -> v.getViolationDate() == null || !v.getViolationDate().isBefore(startOfMonth))
+                .collect(Collectors.groupingBy(SLAViolationDTO::getAdjusterId, Collectors.counting()));
 
         List<User> managers = entityManager
                 .createQuery("SELECT u FROM User u WHERE u.role = :role AND u.isActive = true", User.class)
                 .setParameter("role", UserRole.MANAGER)
                 .getResultList();
 
-        for (Long adjusterId : adjusterIds) {
-            long violationCount = (long) entityManager
-                    .createQuery("SELECT COUNT(s) FROM SlaViolation s WHERE s.adjusterId = :id AND s.violationDate >= :start")
-                    .setParameter("id", adjusterId)
-                    .setParameter("start", startOfMonth)
-                    .getSingleResult();
-
+        for (Map.Entry<Long, Long> entry : violationCounts.entrySet()) {
+            Long adjusterId     = entry.getKey();
+            long violationCount = entry.getValue();
             if (violationCount < SLA_VIOLATION_THRESHOLD) continue;
 
             String referenceId = "ADJ-" + adjusterId;
@@ -262,34 +302,41 @@ public class NotificationServiceImpl implements NotificationService {
 
     /**
      * AGING ALERT — runs daily at midnight.
+     * Fetches BUCKET_90_PLUS records directly from cost-reserve-service via Feign.
+     * The local AgingRecord shadow table is no longer queried.
+     * Skips silently if the client is unavailable.
      */
     @Override
     @Scheduled(cron = "0 0 0 * * *")   // midnight daily
     @Transactional
     public void generateAgingAlerts() {
         log.debug("Scheduler running: generateAgingAlerts");
-
-        List<AgingRecord> criticalAging = entityManager
-                .createQuery("SELECT a FROM AgingRecord a WHERE a.agingBucket IN :buckets AND a.status IN :statuses", AgingRecord.class)
-                .setParameter("buckets", CRITICAL_AGING_BUCKETS)
-                .setParameter("statuses", STUCK_STATUSES)
-                .getResultList();
+        if (costReserveAgingClient == null) {
+            log.debug("CostReserveAgingClient unavailable — skipping aging alert scan");
+            return;
+        }
+        List<AgingRecordDTO> criticalAging;
+        try {
+            criticalAging = costReserveAgingClient.getAgingRecordsByBucket("BUCKET_90_PLUS");
+        } catch (Exception e) {
+            log.warn("Could not fetch aging records from cost-reserve-service: {}", e.getMessage());
+            return;
+        }
 
         List<User> analysts = entityManager
                 .createQuery("SELECT u FROM User u WHERE u.role = :role AND u.isActive = true", User.class)
                 .setParameter("role", UserRole.ANALYST)
                 .getResultList();
 
-        for (AgingRecord record : criticalAging) {
+        for (AgingRecordDTO record : criticalAging) {
             boolean alreadyAlerted = notificationRepository.existsByReferenceIdAndCategoryAndStatus(
                     record.getClaimId(), NotificationCategory.AGING, NotificationStatus.UNREAD);
             if (alreadyAlerted) continue;
 
             String title   = "Critically Aged Claim — " + record.getClaimId();
             String message = String.format(
-                    "Claim %s has been %s for %d days (bucket: %s). Status is still %s. Immediate action required.",
-                    record.getClaimId(), record.getStatus(), record.getAgingDays(),
-                    record.getAgingBucket(), record.getStatus());
+                    "Claim %s has been aging for %d days (bucket: %s). Immediate action required.",
+                    record.getClaimId(), record.getAgingDays(), record.getAgingBucket());
 
             for (User analyst : analysts) {
                 saveSystemNotification(analyst.getUserId(), title, message,

@@ -1,5 +1,6 @@
 package com.claim360.fraudrisk.controller;
 
+import com.claim360.fraudrisk.dto.AutoEvaluateRequest;
 import com.claim360.fraudrisk.dto.RiskScoreRequest;
 import com.claim360.fraudrisk.dto.RiskScoreResponse;
 import com.claim360.fraudrisk.service.RiskScoreService;
@@ -176,6 +177,31 @@ public class RiskScoreController {
             @Valid @RequestBody RiskScoreRequest request) {
         log.info("REST request to update RiskScore with ID: {}", id);
         return ResponseEntity.ok(riskScoreService.updateRiskScore(id, request));
+    }
+
+    // ── Auto-Evaluate (data-ingestion-service pipeline) ──────────────────────
+
+    @Operation(
+            summary = "Auto-evaluate fraud risk from ingestion payload",
+            description = "Called by data-ingestion-service after a claim is ingested. " +
+                    "Applies rule-based indicators (HighCost, UnusualTiming) to the raw " +
+                    "JSON payload and returns a computed risk score."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "Risk score computed and saved",
+                    content = @Content(schema = @Schema(implementation = RiskScoreResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid request body",
+                    content = @Content),
+            @ApiResponse(responseCode = "500", description = "Internal server error",
+                    content = @Content)
+    })
+    @PostMapping("/auto-evaluate")
+    public ResponseEntity<RiskScoreResponse> autoEvaluate(
+            @RequestBody AutoEvaluateRequest request) {
+        log.info("REST auto-evaluate fraud risk for claimId: {}", request.getClaimId());
+        RiskScoreResponse response = riskScoreService.autoEvaluateRisk(
+                request.getClaimId(), request.getPayloadJson());
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     // ── DELETE ───────────────────────────────────────────────────────────────

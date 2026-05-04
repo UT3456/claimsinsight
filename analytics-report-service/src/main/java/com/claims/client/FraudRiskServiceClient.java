@@ -11,6 +11,15 @@ import java.util.List;
 @FeignClient(name = "fraud-risk-service", path = "/api/risk-scores")
 public interface FraudRiskServiceClient {
 
+    /** All risk scores in the portfolio — used for portfolio-level dashboards. */
+    @GetMapping
+    List<FraudRiskScoreDTO> getAllRiskScores();
+
+    /** Risk scores at or above the given threshold (e.g. 80.0 for high-risk). */
+    @GetMapping("/threshold/{threshold}")
+    List<FraudRiskScoreDTO> getRiskScoresAboveThreshold(@PathVariable("threshold") Double threshold);
+
+    /** Risk scores for a single claim. */
     @GetMapping("/claim/{claimId}")
     List<FraudRiskScoreDTO> getRiskScoresByClaimId(@PathVariable("claimId") String claimId);
 }

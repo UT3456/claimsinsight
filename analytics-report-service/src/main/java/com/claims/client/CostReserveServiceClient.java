@@ -8,7 +8,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import java.util.List;
 
 /** Feign client for cost-reserve-service — fetches reserve history for analytics reports. */
-@FeignClient(name = "cost-reserve-service", path = "/api/reserves")
+@FeignClient(name = "cost-reserve-service", path = "/api/reserves",
+        contextId = "costReserveServiceClient")
 public interface CostReserveServiceClient {
 
     @GetMapping("/claim/{claimId}/history")

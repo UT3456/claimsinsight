@@ -1,6 +1,15 @@
 package com.claiminsight.ingestion.service;
 
+import com.claiminsight.ingestion.client.AdjusterOperationsClient;
+import com.claiminsight.ingestion.client.ClaimsMetricsServiceClient;
+import com.claiminsight.ingestion.client.CostReserveServiceClient;
+import com.claiminsight.ingestion.client.DenialLeakageServiceClient;
+import com.claiminsight.ingestion.client.FraudRiskServiceClient;
 import com.claiminsight.ingestion.client.NotificationServiceClient;
+import com.claiminsight.ingestion.client.dto.AutoAnalyzeDenialRequest;
+import com.claiminsight.ingestion.client.dto.AutoEvaluateRiskRequest;
+import com.claiminsight.ingestion.client.dto.AutoGenerateSlaRequest;
+import com.claiminsight.ingestion.client.dto.AutoInitializeCostRequest;
 import com.claiminsight.ingestion.client.dto.NotificationDispatchRequestDTO;
 import com.claiminsight.ingestion.dto.IngestionRequestDTO;
 import com.claiminsight.ingestion.dto.IngestionResponseDTO;
@@ -18,7 +27,9 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -36,6 +47,26 @@ public class IngestionService {
     /** Optional: null when NotificationService is unreachable. Alerting is non-blocking. */
     @Autowired(required = false)
     private NotificationServiceClient notificationServiceClient;
+
+    /** Optional: null when claims-metrics-service is unreachable. KPI generation is non-blocking. */
+    @Autowired(required = false)
+    private ClaimsMetricsServiceClient claimsMetricsServiceClient;
+
+    /** Optional: null when AdjusterAndOperations is unreachable. SLA tracking is non-blocking. */
+    @Autowired(required = false)
+    private AdjusterOperationsClient adjusterOperationsClient;
+
+    /** Optional: null when fraud-risk-service is unreachable. Risk evaluation is non-blocking. */
+    @Autowired(required = false)
+    private FraudRiskServiceClient fraudRiskServiceClient;
+
+    /** Optional: null when denial-leakage-service is unreachable. Denial analysis is non-blocking. */
+    @Autowired(required = false)
+    private DenialLeakageServiceClient denialLeakageServiceClient;
+
+    /** Optional: null when cost-reserve-service is unreachable. Cost/reserve seeding is non-blocking. */
+    @Autowired(required = false)
+    private CostReserveServiceClient costReserveServiceClient;
 
     /** Ingests a raw claim, links it to a DataFeed, and updates the feed's last sync date. */
     @CacheEvict(value = {"rawClaims", "feeds"}, allEntries = true)
@@ -59,6 +90,31 @@ public class IngestionService {
         feed.setLastSyncDate(LocalDateTime.now());
         dataFeedRepository.save(feed);
 
+        // ── Step 1 ── KPI calculation MUST run first.
+        // fraud-risk-service's HighCost rule reads the SEVERITY KPI from
+        // claims-metrics-service via Feign during auto-evaluation (step 2).
+        // If KPIs are not yet persisted, SEVERITY will be missing and the rule
+        // falls back to a raw claimAmount threshold instead of the computed score.
+        // Fire-and-forget: a failure here is non-fatal — KPIs can be recalculated
+        // manually via POST /api/kpis/calculate/{claimId} at any time.
+        triggerKpiCalculation(request.getClaimId());
+
+        // ── Step 2 ── Fraud risk evaluation (depends on SEVERITY KPI from step 1).
+        // Passes payloadJson so HighCost + UnusualTiming rules can extract
+        // claimAmount, policyStartDate, and incidentDate without an extra DB call.
+        triggerFraudEvaluation(request.getClaimId(), request.getPayloadJson());
+
+        // ── Step 3 ── Seed ClaimCost, ClaimReserve, and AgingRecord for this claim.
+        triggerCostInitialization(request.getClaimId(), request.getPayloadJson());
+
+        // ── Step 4 ── Denial pattern analysis and leakage flag detection.
+        triggerDenialAnalysis(request.getClaimId(), request.getPayloadJson());
+
+        // ── Step 5 ── SLA violation auto-generation (last — no upstream KPI dependency).
+        // Derives actual elapsed days from incidentDate / admissionDate / filedDate
+        // in the payload so severity reflects the claim's real age.
+        triggerSlaViolation(request.getClaimId(), request.getPayloadJson());
+
         log.info("Claim {} ingested, rawId: {}", request.getClaimId(), saved.getRawId());
         return claimRawMapper.toResponseDTO(saved);
     }
@@ -80,6 +136,151 @@ public class IngestionService {
         } catch (Exception e) {
             log.warn("Failed to dispatch ingestion-rejected notification for feed {}: {}",
                     feed.getFeedId(), e.getMessage());
+        }
+    }
+
+    /**
+     * Fires a non-blocking SLA violation auto-generation request to AdjusterAndOperations.
+     * Extracts {@code incidentDate} (or {@code admissionDate} / {@code filedDate}) from
+     * the payload JSON and computes the real elapsed days so the severity reflects the
+     * claim's actual age — not a hardcoded placeholder.
+     *
+     * <p>Example: payload with {@code "incidentDate":"2026-01-10"} ingested on 2026-05-04
+     * gives {@code actualDays = 114}, {@code daysOverdue = 84}, severity = CRITICAL.</p>
+     */
+    private void triggerSlaViolation(String claimId, String payloadJson) {
+        if (adjusterOperationsClient == null) {
+            log.warn("AdjusterAndOperations client not available; SLA auto-generation skipped for claim {}", claimId);
+            return;
+        }
+        try {
+            int actualDays = computeActualDays(payloadJson);
+            adjusterOperationsClient.autoGenerateSlaViolation(
+                    AutoGenerateSlaRequest.builder()
+                            .claimRef(claimId)
+                            .adjusterId(1L)
+                            .actualDays(actualDays)
+                            .slaTargetDays(30)
+                            .build());
+            log.info("SLA violation auto-generation triggered for claim {} (actualDays={})", claimId, actualDays);
+        } catch (Exception e) {
+            log.warn("SLA violation auto-generation failed for claim {} (non-fatal): {}", claimId, e.getMessage());
+        }
+    }
+
+    /**
+     * Parses the first available date field from the payload JSON and returns
+     * the number of calendar days elapsed from that date to today.
+     *
+     * <p>Fields tried in order: {@code incidentDate}, {@code admissionDate},
+     * {@code filedDate}. All must be in ISO format {@code YYYY-MM-DD}.</p>
+     *
+     * <p>Returns {@code 31} (a LOW-severity breach placeholder) when no date
+     * field is found or the value cannot be parsed.</p>
+     */
+    private int computeActualDays(String payloadJson) {
+        if (payloadJson == null || payloadJson.isBlank()) return 31;
+        for (String field : new String[]{"incidentDate", "admissionDate", "filedDate"}) {
+            try {
+                String marker = "\"" + field + "\":\"";
+                int idx = payloadJson.indexOf(marker);
+                if (idx < 0) continue;
+                int start = idx + marker.length();
+                int end   = payloadJson.indexOf('"', start);
+                if (end <= start) continue;
+                LocalDate incidentDate = LocalDate.parse(payloadJson.substring(start, end));
+                long days = ChronoUnit.DAYS.between(incidentDate, LocalDate.now());
+                int result = (int) Math.max(1, days);
+                log.debug("SLA actualDays for payload field '{}': {} days", field, result);
+                return result;
+            } catch (Exception ignored) { /* try next field */ }
+        }
+        log.debug("No date field found in payload — using default actualDays=31");
+        return 31;
+    }
+
+    /**
+     * Fires a non-blocking KPI-calculation request to claims-metrics-service.
+     * If the remote call fails (service down, timeout, 4xx/5xx), a WARN is logged
+     * and ingestion is unaffected. The KPIs can always be recalculated later via
+     * POST /api/kpis/calculate/{claimId}.
+     */
+    private void triggerKpiCalculation(String claimId) {
+        if (claimsMetricsServiceClient == null) {
+            log.warn("claims-metrics-service client not available; KPI auto-generation skipped for claim {}", claimId);
+            return;
+        }
+        try {
+            claimsMetricsServiceClient.calculateKpis(claimId);
+            log.info("KPI auto-generation triggered for claim {}", claimId);
+        } catch (Exception e) {
+            log.warn("KPI auto-generation failed for claim {} (non-fatal): {}", claimId, e.getMessage());
+        }
+    }
+
+    /**
+     * Fires a non-blocking fraud risk evaluation request to fraud-risk-service.
+     * Passes payloadJson so the risk engine can extract claimAmount, policyStartDate,
+     * and incidentDate to evaluate HighCost + UnusualTiming rules without a DB roundtrip.
+     */
+    private void triggerFraudEvaluation(String claimId, String payloadJson) {
+        if (fraudRiskServiceClient == null) {
+            log.warn("fraud-risk-service client not available; fraud evaluation skipped for claim {}", claimId);
+            return;
+        }
+        try {
+            fraudRiskServiceClient.autoEvaluateRisk(
+                    AutoEvaluateRiskRequest.builder()
+                            .claimId(claimId)
+                            .payloadJson(payloadJson)
+                            .build());
+            log.info("Fraud risk evaluation triggered for claim {}", claimId);
+        } catch (Exception e) {
+            log.warn("Fraud risk evaluation failed for claim {} (non-fatal): {}", claimId, e.getMessage());
+        }
+    }
+
+    /**
+     * Fires a non-blocking denial analysis request to denial-leakage-service.
+     * If the payload contains a denial code or status=DENIED, a DenialPattern is created.
+     * Overpayment LeakageFlags are raised when claimAmount exceeds policyLimit.
+     */
+    private void triggerDenialAnalysis(String claimId, String payloadJson) {
+        if (denialLeakageServiceClient == null) {
+            log.warn("denial-leakage-service client not available; denial analysis skipped for claim {}", claimId);
+            return;
+        }
+        try {
+            denialLeakageServiceClient.autoAnalyzeDenial(
+                    AutoAnalyzeDenialRequest.builder()
+                            .claimId(claimId)
+                            .payloadJson(payloadJson)
+                            .build());
+            log.info("Denial analysis triggered for claim {}", claimId);
+        } catch (Exception e) {
+            log.warn("Denial analysis failed for claim {} (non-fatal): {}", claimId, e.getMessage());
+        }
+    }
+
+    /**
+     * Fires a non-blocking cost/reserve/aging initialization request to cost-reserve-service.
+     * Seeds ClaimCost (SETTLEMENT), ClaimReserve (120% of claimAmount), and
+     * AgingRecord (bucket from incidentDate elapsed days) in one call.
+     */
+    private void triggerCostInitialization(String claimId, String payloadJson) {
+        if (costReserveServiceClient == null) {
+            log.warn("cost-reserve-service client not available; cost initialization skipped for claim {}", claimId);
+            return;
+        }
+        try {
+            costReserveServiceClient.autoInitializeCost(
+                    AutoInitializeCostRequest.builder()
+                            .claimId(claimId)
+                            .payloadJson(payloadJson)
+                            .build());
+            log.info("Cost/reserve/aging initialization triggered for claim {}", claimId);
+        } catch (Exception e) {
+            log.warn("Cost initialization failed for claim {} (non-fatal): {}", claimId, e.getMessage());
         }
     }
 

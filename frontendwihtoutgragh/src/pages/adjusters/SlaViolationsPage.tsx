@@ -1,71 +1,59 @@
 import { useEffect, useMemo, useReducer, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Table, Modal, Form, Input, DatePicker, Alert, Row, Col,
-  App as AntApp,
+  Table, Alert,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import dayjs from 'dayjs';
-import { RefreshCw, Plus, AlertTriangle } from 'lucide-react';
+import { RefreshCw, AlertTriangle } from 'lucide-react';
 
 import {
   PageHeader, KpiCard, DataCard, Badge, Chip, StatusDot,
-  GhostButton, DarkButton, EmptyState, CHART,
+  GhostButton, EmptyState, CHART,
 } from '../../components/ui';
 import type { BadgeTone, StatusTone } from '../../components/ui';
-import { slaApi, type SlaViolation, type CreateSlaViolationRequest } from '../../api/adjustersApi';
+import { slaApi, type SlaViolation } from '../../api/adjustersApi';
 
 /**
- * SlaViolationsPage — follows the adjusters table pattern.
- * Layout: PageHeader · 4 KpiCards · two-col charts · DataCard table.
+ * SlaViolationsPage — read-only view of SLA violations.
+ * Violations are created automatically when a claim is ingested into an
+ * ACTIVE data feed (data-ingestion-service → AdjusterAndOperations Feign call).
+ * Manual "Record violation" has been removed; the page is purely observational.
  */
 
 // ── Reducer ──────────────────────────────────────────────────────────────────
 
 interface State {
-  items: SlaViolation[];
-  loading: boolean;
-  error: string | null;
-  modalOpen: boolean;
-  submitting: boolean;
+  items:          SlaViolation[];
+  loading:        boolean;
+  error:          string | null;
   severityFilter: 'ALL' | 'HIGH' | 'MEDIUM' | 'LOW';
-  escalatedOnly: boolean;
+  escalatedOnly:  boolean;
 }
 
 type Action =
   | { type: 'FETCH_START' }
   | { type: 'FETCH_SUCCESS'; payload: SlaViolation[] }
-  | { type: 'FETCH_ERROR'; payload: string }
-  | { type: 'OPEN_MODAL' }
-  | { type: 'CLOSE_MODAL' }
-  | { type: 'SUBMIT_START' }
-  | { type: 'SUBMIT_SUCCESS'; payload: SlaViolation }
-  | { type: 'SUBMIT_ERROR' }
-  | { type: 'SET_SEVERITY'; payload: State['severityFilter'] }
+  | { type: 'FETCH_ERROR';   payload: string }
+  | { type: 'SET_SEVERITY';  payload: State['severityFilter'] }
   | { type: 'TOGGLE_ESCALATED' };
 
 function reducer(s: State, a: Action): State {
   switch (a.type) {
-    case 'FETCH_START':       return { ...s, loading: true, error: null };
-    case 'FETCH_SUCCESS':     return { ...s, loading: false, items: a.payload };
-    case 'FETCH_ERROR':       return { ...s, loading: false, error: a.payload };
-    case 'OPEN_MODAL':        return { ...s, modalOpen: true };
-    case 'CLOSE_MODAL':       return { ...s, modalOpen: false, submitting: false };
-    case 'SUBMIT_START':      return { ...s, submitting: true };
-    case 'SUBMIT_SUCCESS':    return { ...s, submitting: false, modalOpen: false, items: [a.payload, ...s.items] };
-    case 'SUBMIT_ERROR':      return { ...s, submitting: false };
-    case 'SET_SEVERITY':      return { ...s, severityFilter: a.payload };
-    case 'TOGGLE_ESCALATED':  return { ...s, escalatedOnly: !s.escalatedOnly };
-    default:                  return s;
+    case 'FETCH_START':      return { ...s, loading: true, error: null };
+    case 'FETCH_SUCCESS':    return { ...s, loading: false, items: a.payload };
+    case 'FETCH_ERROR':      return { ...s, loading: false, error: a.payload };
+    case 'SET_SEVERITY':     return { ...s, severityFilter: a.payload };
+    case 'TOGGLE_ESCALATED': return { ...s, escalatedOnly: !s.escalatedOnly };
+    default:                 return s;
   }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const SEVERITY_META: Record<string, { tone: BadgeTone; status: StatusTone; color: string }> = {
-  HIGH:   { tone: 'red',    status: 'danger',  color: CHART.red },
-  MEDIUM: { tone: 'amber',  status: 'warning', color: CHART.amber },
-  LOW:    { tone: 'blue',   status: 'info',    color: CHART.blue },
+  HIGH:   { tone: 'red',   status: 'danger',  color: CHART.red   },
+  MEDIUM: { tone: 'amber', status: 'warning', color: CHART.amber },
+  LOW:    { tone: 'blue',  status: 'info',    color: CHART.blue  },
 };
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -73,41 +61,20 @@ const SEVERITY_META: Record<string, { tone: BadgeTone; status: StatusTone; color
 export default function SlaViolationsPage() {
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(reducer, {
-    items: [], loading: false, error: null, modalOpen: false, submitting: false,
+    items: [], loading: false, error: null,
     severityFilter: 'ALL', escalatedOnly: false,
   });
-  const [form] = Form.useForm();
-  const { message } = AntApp.useApp();
 
   const load = useCallback(async () => {
     dispatch({ type: 'FETCH_START' });
     try {
       dispatch({ type: 'FETCH_SUCCESS', payload: await slaApi.getAll() });
-    } catch { dispatch({ type: 'FETCH_ERROR', payload: 'Failed to load SLA violations.' }); }
+    } catch {
+      dispatch({ type: 'FETCH_ERROR', payload: 'Failed to load SLA violations.' });
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  const handleCreate = async (values: Record<string, unknown>) => {
-    dispatch({ type: 'SUBMIT_START' });
-    try {
-      const req: CreateSlaViolationRequest = {
-        claimId:       Number(values.claimId),
-        adjusterId:    Number(values.adjusterId),
-        violationType: values.violationType as string,
-        slaTargetDays: Number(values.slaTargetDays),
-        actualDays:    Number(values.actualDays),
-        violationDate: (values.violationDate as dayjs.Dayjs).format('YYYY-MM-DD'),
-      };
-      dispatch({ type: 'SUBMIT_SUCCESS', payload: await slaApi.create(req) });
-      form.resetFields();
-      message.success('SLA violation logged');
-    } catch (err) {
-      dispatch({ type: 'SUBMIT_ERROR' });
-      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to log SLA violation.';
-      message.error(msg);
-    }
-  };
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const high      = state.items.filter(i => i.severity === 'HIGH').length;
@@ -121,18 +88,21 @@ export default function SlaViolationsPage() {
   const filtered = useMemo(() => {
     let list = state.items;
     if (state.severityFilter !== 'ALL') list = list.filter(i => i.severity === state.severityFilter);
-    if (state.escalatedOnly) list = list.filter(i => i.escalated);
+    if (state.escalatedOnly)            list = list.filter(i => i.escalated);
     return list;
   }, [state.items, state.severityFilter, state.escalatedOnly]);
 
   const severityMix = useMemo(() => (
     [
-      { name: 'HIGH',   value: high,   color: CHART.red },
+      { name: 'HIGH',   value: high,   color: CHART.red   },
       { name: 'MEDIUM', value: medium, color: CHART.amber },
-      { name: 'LOW',    value: low,    color: CHART.blue },
+      { name: 'LOW',    value: low,    color: CHART.blue  },
     ].filter(s => s.value > 0)
   ), [high, medium, low]);
 
+  const sevCycle: State['severityFilter'][] = ['ALL', 'HIGH', 'MEDIUM', 'LOW'];
+
+  // ── Columns ──────────────────────────────────────────────────────────────
   const columns: ColumnsType<SlaViolation> = [
     {
       title: 'ID', dataIndex: 'violationId', key: 'violationId', width: 70,
@@ -144,7 +114,9 @@ export default function SlaViolationsPage() {
         <a
           onClick={() => navigate(`/claims/${v}`)}
           style={{ color: 'var(--ci-primary)', fontFamily: 'ui-monospace, SFMono-Regular, monospace', fontSize: 11 }}
-        >CLM-{v}</a>
+        >
+          CLM-{v}
+        </a>
       ),
     },
     {
@@ -193,8 +165,6 @@ export default function SlaViolationsPage() {
     },
   ];
 
-  const sevCycle: State['severityFilter'][] = ['ALL', 'HIGH', 'MEDIUM', 'LOW'];
-
   return (
     <div>
       <PageHeader
@@ -221,22 +191,21 @@ export default function SlaViolationsPage() {
             <GhostButton onClick={load} icon={<RefreshCw size={12} strokeWidth={1.8} />}>
               Refresh
             </GhostButton>
-            <DarkButton onClick={() => dispatch({ type: 'OPEN_MODAL' })} icon={<Plus size={12} strokeWidth={2} />}>
-              Record violation
-            </DarkButton>
           </>
         }
       />
 
       {/* KPI row */}
       <div style={styles.kpiRow}>
-        <KpiCard label="Total violations" value={state.items.length.toLocaleString()} delta="Breach count" deltaDirection="flat" />
+        <KpiCard label="Total violations" value={state.items.length.toLocaleString()} delta="Breach count"  deltaDirection="flat" />
         <KpiCard label="High severity"    value={high.toLocaleString()} delta={high > 0 ? 'Action required' : 'None open'} deltaDirection={high > 0 ? 'up' : 'flat'} deltaTone={high > 0 ? 'down' : 'up'} tone={high > 0 ? 'danger' : 'default'} />
         <KpiCard label="Escalated"        value={escalated.toLocaleString()} delta={`${state.items.length ? Math.round((escalated / state.items.length) * 100) : 0}% of total`} deltaDirection="flat" tone={escalated > 0 ? 'warning' : 'default'} />
         <KpiCard label="Avg overdue"      value={`${avgOverdue.toFixed(1)}d`} delta={avgOverdue > 3 ? 'Above target' : 'Within tolerance'} deltaDirection={avgOverdue > 3 ? 'up' : 'down'} deltaTone={avgOverdue > 3 ? 'down' : 'up'} />
       </div>
 
-      {state.error && <Alert type="error" showIcon message={state.error} style={{ marginBottom: 12, borderRadius: 8 }} closable />}
+      {state.error && (
+        <Alert type="error" showIcon message={state.error} style={{ marginBottom: 12, borderRadius: 8 }} closable />
+      )}
 
       {/* Severity mix */}
       <div style={{ marginBottom: 16 }}>
@@ -247,7 +216,7 @@ export default function SlaViolationsPage() {
             <div style={styles.severityList}>
               {severityMix.map((s) => {
                 const total = high + medium + low;
-                const pct = total ? Math.round((s.value / total) * 100) : 0;
+                const pct   = total ? Math.round((s.value / total) * 100) : 0;
                 return (
                   <div key={s.name} style={styles.severityRow}>
                     <div style={styles.severityHeader}>
@@ -280,7 +249,11 @@ export default function SlaViolationsPage() {
         {!state.loading && filtered.length === 0 ? (
           <EmptyState
             title={state.severityFilter !== 'ALL' || state.escalatedOnly ? 'No matching violations' : 'No SLA violations'}
-            description={state.severityFilter !== 'ALL' || state.escalatedOnly ? 'Try clearing filters to view all breaches.' : 'All deadlines are being met — nice work.'}
+            description={
+              state.severityFilter !== 'ALL' || state.escalatedOnly
+                ? 'Try clearing filters to view all breaches.'
+                : 'All deadlines are being met — violations appear automatically when claims are ingested.'
+            }
             tone={state.severityFilter === 'ALL' && !state.escalatedOnly ? 'positive' : 'neutral'}
             actions={(state.severityFilter !== 'ALL' || state.escalatedOnly) ? (
               <GhostButton onClick={() => {
@@ -301,28 +274,6 @@ export default function SlaViolationsPage() {
           />
         )}
       </DataCard>
-
-      <Modal
-        title="Record SLA violation"
-        open={state.modalOpen}
-        onCancel={() => { dispatch({ type: 'CLOSE_MODAL' }); form.resetFields(); }}
-        onOk={() => form.submit()}
-        confirmLoading={state.submitting}
-        okText="Record violation"
-        destroyOnClose
-        width={520}
-      >
-        <Form form={form} layout="vertical" onFinish={handleCreate}>
-          <Row gutter={12}>
-            <Col span={12}><Form.Item name="claimId" label="Claim ID (numeric)" rules={[{ required: true }]}><Input type="number" min={1} placeholder="1" /></Form.Item></Col>
-            <Col span={12}><Form.Item name="adjusterId" label="Adjuster ID" rules={[{ required: true }]}><Input type="number" min={1} placeholder="1" /></Form.Item></Col>
-            <Col span={12}><Form.Item name="violationType" label="Violation type" rules={[{ required: true }]}><Input placeholder="RESPONSE_TIME" /></Form.Item></Col>
-            <Col span={12}><Form.Item name="violationDate" label="Violation date" rules={[{ required: true }]}><DatePicker style={{ width: '100%' }} /></Form.Item></Col>
-            <Col span={12}><Form.Item name="slaTargetDays" label="SLA target (days)" rules={[{ required: true }]}><Input type="number" min={1} placeholder="5" /></Form.Item></Col>
-            <Col span={12}><Form.Item name="actualDays" label="Actual days" rules={[{ required: true }]}><Input type="number" min={1} placeholder="8" /></Form.Item></Col>
-          </Row>
-        </Form>
-      </Modal>
     </div>
   );
 }
@@ -331,16 +282,14 @@ const styles: Record<string, React.CSSProperties> = {
   kpiRow: {
     display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16,
   },
-  severityList: {
-    display: 'flex', flexDirection: 'column', gap: 14, padding: '4px 2px',
-  },
-  severityRow: { display: 'flex', flexDirection: 'column', gap: 6 },
+  severityList:  { display: 'flex', flexDirection: 'column', gap: 14, padding: '4px 2px' },
+  severityRow:   { display: 'flex', flexDirection: 'column', gap: 6 },
   severityHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   severityTrack: {
     height: 8, borderRadius: 4,
     background: 'var(--ci-bg-surface-2)', overflow: 'hidden',
   },
-  severityFill: { height: '100%', borderRadius: 4, transition: 'width 0.3s' },
+  severityFill:  { height: '100%', borderRadius: 4, transition: 'width 0.3s' },
   escalatedNote: {
     display: 'flex', alignItems: 'center', gap: 6,
     marginTop: 6, padding: '8px 10px',

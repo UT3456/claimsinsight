@@ -12,6 +12,7 @@ import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -222,6 +223,46 @@ public class AgingRecordServiceImpl implements AgingRecordService {
         health.put("criticalClaims_90Plus", criticalClaims);
         health.put("bucketDistributionPercentage", bucketPercentages);
         return health;
+    }
+
+    // ── Daily Aging Recompute ────────────────────────────────────────────────────
+
+    /**
+     * Runs daily at 01:00 and increments every {@link AgingRecord}'s {@code agingDays}
+     * by 1, then re-derives the bucket. This keeps the aging data current without
+     * requiring a new ingestion event for each claim.
+     *
+     * <p>When a record transitions into {@code BUCKET_90_PLUS} for the first time, a
+     * critical aging notification is dispatched to ANALYST + MANAGER via the
+     * {@link NotificationServiceClient} (fire-and-forget).</p>
+     */
+    @Scheduled(cron = "0 0 1 * * *")
+    public void computeAgingForAllClaims() {
+        List<AgingRecord> all = agingRecordRepository.findAll();
+        if (all.isEmpty()) {
+            log.info("Daily aging recompute: no records found — skipping.");
+            return;
+        }
+        log.info("Daily aging recompute starting for {} record(s)...", all.size());
+        int updated = 0;
+        for (AgingRecord record : all) {
+            try {
+                AgingBucket previousBucket = record.getAgingBucket();
+                record.setAgingDays(record.getAgingDays() + 1);
+                record.setAgingBucket(deriveBucket(record.getAgingDays()));
+                agingRecordRepository.save(record);
+
+                // Notify on bucket transition into critical territory (only once)
+                if (record.getAgingBucket() == AgingBucket.BUCKET_90_PLUS
+                        && previousBucket != AgingBucket.BUCKET_90_PLUS) {
+                    sendCriticalAgingNotification(record);
+                }
+                updated++;
+            } catch (Exception e) {
+                log.warn("Aging recompute failed for agingId {}: {}", record.getAgingId(), e.getMessage());
+            }
+        }
+        log.info("Daily aging recompute complete: {} of {} records updated", updated, all.size());
     }
 
     // -------------------------------------------------------

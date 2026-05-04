@@ -11,6 +11,15 @@ import java.util.List;
 @FeignClient(name = "claims-metrics-service", path = "/api/kpis")
 public interface ClaimsMetricsServiceClient {
 
+    /** All KPI records across all claims — used for portfolio-level dashboards. */
+    @GetMapping
+    List<ClaimKpiDTO> getAllKpis();
+
+    /** All KPI records for a specific metric type (e.g. "TAT", "SEVERITY"). */
+    @GetMapping("/metric/{metricName}")
+    List<ClaimKpiDTO> getKpisByMetricName(@PathVariable("metricName") String metricName);
+
+    /** KPI records for a single claim. */
     @GetMapping("/claim/{claimId}")
     List<ClaimKpiDTO> getKpisByClaimId(@PathVariable("claimId") String claimId);
 }

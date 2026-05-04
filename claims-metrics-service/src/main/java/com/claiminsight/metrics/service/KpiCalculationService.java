@@ -8,9 +8,11 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.claiminsight.metrics.client.DataIngestionClient;
@@ -94,34 +96,37 @@ public class KpiCalculationService {
         BigDecimal cycleTime = BigDecimal.valueOf(Math.max(1, cycleTimeDays));
 
         // ── TAT (Turnaround Time) ────────────────────────────────────────
-        LocalDate incidentDate = extractIncidentDate(records.get(0).getPayloadJson(), firstIngested);
-        long tatDays = ChronoUnit.DAYS.between(incidentDate, today);
+        // Start: when the claim was officially filed (filedDate preferred, then incidentDate)
+        // End  : when the claim was closed/settled; falls back to today for still-open claims
+        String payloadJson0 = records.get(0).getPayloadJson();
+        LocalDate tatStart = extractDate(payloadJson0,
+                new String[]{"filedDate", "incidentDate", "admissionDate"}, firstIngested);
+        LocalDate tatEnd   = extractDate(payloadJson0,
+                new String[]{"closedDate", "settlementDate", "resolvedDate", "closureDate"}, today);
+        long tatDays = ChronoUnit.DAYS.between(tatStart, tatEnd);
         BigDecimal tat = BigDecimal.valueOf(Math.max(1, tatDays));
 
         // ── SEVERITY ────────────────────────────────────────────────────
-        BigDecimal claimAmount = extractClaimAmount(records.get(0).getPayloadJson());
-        BigDecimal severity = claimAmount
-                .divide(BigDecimal.valueOf(10_000), 4, RoundingMode.HALF_UP)
-                .min(BigDecimal.TEN)
-                .max(BigDecimal.ONE)
-                .setScale(2, RoundingMode.HALF_UP);
+        // Portfolio-relative: z-score vs existing SEVERITY KPIs (fallback to fixed scale).
+        BigDecimal claimAmount = extractClaimAmount(payloadJson0);
+        BigDecimal severity = computePortfolioRelativeSeverity(claimAmount);
 
         // ── LOSS RATIO ───────────────────────────────────────────────────
-        BigDecimal premium = extractPremium(records.get(0).getPayloadJson());
+        BigDecimal premium = extractPremium(payloadJson0);
         BigDecimal lossRatio = premium.compareTo(BigDecimal.ZERO) > 0
                 ? claimAmount.divide(premium, 4, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
 
         // ── SETTLEMENT TIME ──────────────────────────────────────────────
-        // Days from incident/filing date to settlement/closure date from payload.
-        // Falls back to cycleTime when settlementDate is absent.
-        LocalDate settlementDate = extractSettlementDate(records.get(0).getPayloadJson(), null);
+        // Days from filing/incident date to settlement/closure; falls back to cycleTime.
+        LocalDate settlementDate = extractDate(payloadJson0,
+                new String[]{"settlementDate", "closedDate", "resolvedDate", "closureDate"}, null);
         BigDecimal settlementTime;
         if (settlementDate != null) {
-            long settlementDays = ChronoUnit.DAYS.between(incidentDate, settlementDate);
+            long settlementDays = ChronoUnit.DAYS.between(tatStart, settlementDate);
             settlementTime = BigDecimal.valueOf(Math.max(1, settlementDays));
         } else {
-            settlementTime = cycleTime; // use cycle time as proxy when settlement date unavailable
+            settlementTime = cycleTime; // use cycle time as proxy when closure date is absent
         }
 
         // ── SAVE ALL 6 KPIs ─────────────────────────────────────────────
@@ -192,15 +197,56 @@ public class KpiCalculationService {
         return claimKpiMapper.toResponseDTO(claimKpiRepository.save(kpi));
     }
 
-    private LocalDate extractIncidentDate(String payloadJson, LocalDate fallback) {
+    // ── Nightly KPI Recompute ────────────────────────────────────────────────────
+
+    /**
+     * Recomputes KPIs for every claim that has had at least one KPI record.
+     * Runs nightly at 02:00 so dashboards never serve stale data.
+     * Each claim recalculates independently; a failure on one claim is logged and
+     * skipped without aborting the rest of the batch.
+     */
+    @Scheduled(cron = "0 0 2 * * *")
+    @CacheEvict(value = "kpis", allEntries = true)
+    public void recalculateAllKpisNightly() {
+        List<String> claimIds = claimKpiRepository.findAllDistinctClaimIds();
+        if (claimIds.isEmpty()) {
+            log.info("Nightly KPI recompute: no claims found — skipping.");
+            return;
+        }
+        log.info("Nightly KPI recompute starting for {} claim(s)...", claimIds.size());
+        int success = 0, failed = 0;
+        for (String claimId : claimIds) {
+            try {
+                calculateAndSave(claimId);
+                success++;
+            } catch (Exception e) {
+                log.warn("Nightly KPI recompute failed for claimId {}: {}", claimId, e.getMessage());
+                failed++;
+            }
+        }
+        log.info("Nightly KPI recompute complete: {} succeeded, {} failed (total={})",
+                success, failed, claimIds.size());
+    }
+
+    // ── Payload extraction helpers ───────────────────────────────────────────────
+
+    /**
+     * Generic date extractor: tries each field name in order and returns the first
+     * successfully parsed {@link LocalDate}. Falls back to {@code fallback} when none
+     * of the fields are present or parseable. All field values must be ISO-8601 dates.
+     */
+    private LocalDate extractDate(String payloadJson, String[] fields, LocalDate fallback) {
         try {
             JsonNode node = objectMapper.readTree(payloadJson);
-            for (String field : new String[]{"incidentDate", "admissionDate"}) {
+            for (String field : fields) {
                 JsonNode n = node.get(field);
-                if (n != null && !n.isNull()) return LocalDate.parse(n.asText());
+                if (n != null && !n.isNull()) {
+                    String text = n.asText();
+                    if (!text.isEmpty()) return LocalDate.parse(text);
+                }
             }
         } catch (Exception e) {
-            log.warn("Could not parse incidentDate from payload, using fallback");
+            log.warn("Could not parse date fields {} from payload, using fallback", java.util.Arrays.toString(fields));
         }
         return fallback;
     }
@@ -229,16 +275,47 @@ public class KpiCalculationService {
         return BigDecimal.ZERO;
     }
 
-    private LocalDate extractSettlementDate(String payloadJson, LocalDate fallback) {
+    // ── Portfolio-relative SEVERITY ──────────────────────────────────────────────
+
+    /**
+     * Computes a portfolio-relative severity score on a 1–10 scale.
+     *
+     * <p>When the portfolio has ≥ 5 existing SEVERITY KPIs the score is derived from
+     * the claim's z-score relative to the portfolio mean and standard deviation:
+     * {@code adjustedSeverity = 5 + z × 2.0}, clamped to [1, 10].
+     * This means an average-cost claim scores ~5; every standard-deviation above the
+     * mean adds 2 points, so outliers naturally score higher.</p>
+     *
+     * <p>Falls back to the fixed {@code claimAmount / 10,000} formula when the
+     * portfolio is too small to produce a reliable baseline.</p>
+     */
+    private BigDecimal computePortfolioRelativeSeverity(BigDecimal claimAmount) {
         try {
-            JsonNode node = objectMapper.readTree(payloadJson);
-            for (String field : new String[]{"settlementDate", "closedDate", "resolvedDate", "closureDate"}) {
-                JsonNode n = node.get(field);
-                if (n != null && !n.isNull()) return LocalDate.parse(n.asText());
+            List<ClaimKPI> portfolioKpis = claimKpiRepository.findByMetricName(MetricName.SEVERITY);
+            if (portfolioKpis.size() >= 5) {
+                List<Double> vals = portfolioKpis.stream()
+                        .map(k -> k.getMetricValue().doubleValue())
+                        .collect(Collectors.toList());
+                double mean = vals.stream().mapToDouble(d -> d).average().orElse(5.0);
+                double variance = vals.stream()
+                        .mapToDouble(v -> Math.pow(v - mean, 2))
+                        .average().orElse(1.0);
+                double stdDev = Math.max(0.1, Math.sqrt(variance)); // floor prevents division by zero
+
+                // Raw severity using the classic formula (unclamped)
+                double rawSeverity = claimAmount.doubleValue() / 10_000.0;
+                double zScore = (rawSeverity - mean) / stdDev;
+                double adjusted = 5.0 + zScore * 2.0;
+                log.debug("Portfolio-relative SEVERITY: rawSeverity={}, mean={}, stdDev={}, z={}, adjusted={}",
+                        rawSeverity, mean, stdDev, zScore, adjusted);
+                return BigDecimal.valueOf(Math.max(1.0, Math.min(10.0, adjusted)))
+                        .setScale(2, RoundingMode.HALF_UP);
             }
         } catch (Exception e) {
-            log.warn("Could not parse settlementDate from payload, settlement time will use cycleTime as proxy");
+            log.warn("Portfolio SEVERITY computation failed, falling back to fixed scale: {}", e.getMessage());
         }
-        return fallback;
+        // Fallback: original fixed-scale formula
+        return claimAmount.divide(BigDecimal.valueOf(10_000), 4, RoundingMode.HALF_UP)
+                .min(BigDecimal.TEN).max(BigDecimal.ONE).setScale(2, RoundingMode.HALF_UP);
     }
 }

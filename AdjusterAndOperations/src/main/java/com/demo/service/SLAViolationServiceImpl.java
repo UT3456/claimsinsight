@@ -302,6 +302,69 @@ public class SLAViolationServiceImpl implements SLAViolationService {
         throw new DatabaseOperationException("Fetch error: " + e.getMessage());
     }
 
+    /**
+     * Creates a default SLA tracking violation for a claim that was just ingested.
+     * Bypasses the breach-validation gate (which requires actualDays > slaTargetDays)
+     * because the record is generated automatically — not entered manually.
+     *
+     * <p>claimRef is a String (e.g. "CLM-2026-AUTO-001") whereas the SLAViolation
+     * entity stores a Long claimId. We derive a stable Long via hashCode so the
+     * same claimRef always maps to the same numeric ID across calls.</p>
+     */
+    /**
+     * Auto-generates a real SLA violation using the elapsed days computed from
+     * the claim's incident date in the payload JSON.
+     *
+     * <p>Severity is driven by {@code daysOverdue = actualDays - slaTargetDays}:</p>
+     * <ul>
+     *   <li>≤ 2 days  → LOW</li>
+     *   <li>≤ 5 days  → MEDIUM</li>
+     *   <li>≤ 10 days → HIGH</li>
+     *   <li>> 10 days → CRITICAL  (fires a notification to MANAGER + EXECUTIVE)</li>
+     * </ul>
+     */
+    @Override
+    @CacheEvict(allEntries = true)
+    public SLAViolationDTO autoGenerateSlaViolation(String claimRef, Long adjusterId,
+                                                    Integer actualDays, Integer slaTargetDays) {
+        if (claimRef == null || claimRef.isBlank()) {
+            throw new com.demo.exception.InvalidInputException("claimRef is required for auto-generation.");
+        }
+        try {
+            // Derive a stable positive Long from the string claim reference.
+            long numericClaimId = Math.abs((long) claimRef.hashCode()) % 9_999_999L + 1L;
+
+            int target = (slaTargetDays != null && slaTargetDays > 0) ? slaTargetDays : 30;
+            // Use real elapsed days when provided; fall back to target+1 (LOW breach placeholder).
+            int actual = (actualDays != null && actualDays >= 1) ? actualDays : target + 1;
+
+            SLAViolation entity = new SLAViolation();
+            entity.setClaimId(numericClaimId);
+            entity.setAdjusterId(adjusterId != null ? adjusterId : 1L);
+            entity.setViolationType("CLAIM_ASSESSMENT");
+            entity.setSlaTargetDays(target);
+            entity.setActualDays(actual);
+            entity.setViolationDate(new Date());
+
+            SLAViolation saved = repository.save(entity);
+            SLAViolationDTO result = computeAndEnrich(saved);
+
+            log.info("Auto-generated SLA violation for claimRef '{}' → violationId={}, " +
+                     "actualDays={}, slaTarget={}, daysOverdue={}, severity={}",
+                    claimRef, saved.getViolationId(), actual, target,
+                    result.getDaysOverdue(), result.getSeverity());
+
+            // Fire notification for CRITICAL violations (severity computed inside computeAndEnrich).
+            if ("CRITICAL".equals(result.getSeverity())) {
+                sendCriticalViolationNotification(result);
+            }
+
+            return result;
+        } catch (Exception e) {
+            throw new DatabaseOperationException("Error auto-generating SLA violation for '" + claimRef + "': " + e.getMessage());
+        }
+    }
+
     private void validateViolationInput(SLAViolationDTO dto) {
         if (dto == null) throw new InvalidInputException("Data is null.");
         if (dto.getActualDays() <= dto.getSlaTargetDays()) {

@@ -4,6 +4,7 @@ import com.claim360.denialleakage.dto.DenialPatternRequest;
 import com.claim360.denialleakage.dto.DenialPatternResponse;
 
 import java.util.List;
+import java.util.Map;
 
 public interface DenialPatternService {
 
@@ -33,4 +34,7 @@ public interface DenialPatternService {
 
     // Delete
     void deleteDenialPattern(Long patternId);
+
+    // Auto-analyze denial patterns and leakage from ingested claim payload
+    Map<String, Object> autoAnalyzeDenial(String claimId, String payloadJson);
 }

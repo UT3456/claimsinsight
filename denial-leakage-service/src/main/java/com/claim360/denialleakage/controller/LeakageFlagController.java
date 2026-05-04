@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/leakage-flags")
@@ -102,5 +103,15 @@ public class LeakageFlagController {
     public ResponseEntity<String> deleteLeakageFlag(@PathVariable Long id) {
         leakageFlagService.deleteLeakageFlag(id);
         return ResponseEntity.ok("LeakageFlag with ID " + id + " deleted successfully.");
+    }
+
+    /**
+     * Returns a dashboard-ready leakage rollup: total flag count, total estimated
+     * loss, and a per-{@link LeakageType} breakdown. Backed by a single GROUP BY
+     * aggregate query — suitable for direct consumption by the analytics dashboard.
+     */
+    @GetMapping("/summary")
+    public ResponseEntity<Map<String, Object>> getLeakageSummaryByType() {
+        return ResponseEntity.ok(leakageFlagService.getLeakageSummaryByType());
     }
 }

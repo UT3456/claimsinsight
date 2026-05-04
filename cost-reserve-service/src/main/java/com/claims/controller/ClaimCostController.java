@@ -143,5 +143,13 @@ public class ClaimCostController {
     public ResponseEntity<Map<String, Object>> getHighestCostClaim() {
         return ResponseEntity.ok(claimCostServiceImpl.getHighestCostClaim());
     }
+
+    @PostMapping("/auto-initialize")
+    public ResponseEntity<java.util.Map<String, Object>> autoInitialize(
+            @RequestBody com.claims.dto.request.AutoInitializeRequest request) {
+        java.util.Map<String, Object> result = claimCostServiceImpl.autoInitializeClaim(
+                request.getClaimId(), request.getPayloadJson());
+        return ResponseEntity.status(HttpStatus.CREATED).body(result);
+    }
 }
 

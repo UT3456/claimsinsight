@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useReducer, useCallback } from 'react';
+import { useEffect, useMemo, useReducer, useCallback, useState } from 'react';
 import {
   Table, Button, Modal, Form, Input, Alert, Tooltip, Popconfirm, Typography, Dropdown,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { MenuProps } from 'antd';
 import { Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import {
   PageHeader, DataCard, DarkButton, GhostButton, EmptyState, Badge, Chip,
@@ -74,18 +74,26 @@ function reducer(s: State, a: Action): State {
 
 export default function RawClaimsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
   const [state, dispatch] = useReducer(reducer, {
     items: [], loading: false, error: null, modalOpen: false, submitting: false,
     searchClaimId: '', windowKey: 'all',
   });
   const [form] = Form.useForm();
 
+  // ?feedId=N — set when navigating here from the Data Feeds "Claims" count link.
+  const [feedFilter, setFeedFilter] = useState<number | null>(() => {
+    const p = searchParams.get('feedId');
+    return p ? Number(p) : null;
+  });
+
   const activeWindow = TIME_WINDOWS.find(w => w.key === state.windowKey) ?? TIME_WINDOWS[3];
 
-  // Apply the time-window filter client-side so flipping it is instant.
-  // Newest first — handy regardless of window so the most recent ingest is on top.
+  // Apply time-window + optional feed filter client-side.
+  // Newest first so the most recent ingest is always on top.
   const filtered = useMemo(() => {
-    const list = activeWindow.hours === null
+    let list = activeWindow.hours === null
       ? state.items
       : state.items.filter(item => {
           if (!item.ingestedDate) return false;
@@ -93,10 +101,11 @@ export default function RawClaimsPage() {
           if (Number.isNaN(ageMs)) return false;
           return ageMs <= activeWindow.hours! * 3_600_000;
         });
+    if (feedFilter !== null) list = list.filter(i => i.feedId === feedFilter);
     return [...list].sort((a, b) =>
       (b.ingestedDate ?? '').localeCompare(a.ingestedDate ?? '')
     );
-  }, [state.items, activeWindow.hours]);
+  }, [state.items, activeWindow.hours, feedFilter]);
 
   const windowMenu: MenuProps = {
     items: TIME_WINDOWS.map(w => ({ key: w.key, label: w.label })),
@@ -113,8 +122,6 @@ export default function RawClaimsPage() {
         : await ingestApi.getAll();
       dispatch({ type: 'SUCCESS', payload: data });
     } catch (err) {
-      // axiosInstance interceptor sets `userMessage`; surface that instead of
-      // a generic string so users see the actual backend reason.
       const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to load raw claims.';
       dispatch({ type: 'ERROR', payload: msg });
     }
@@ -218,12 +225,22 @@ export default function RawClaimsPage() {
       <PageHeader
         title="Raw claims"
         subtitle={
-          activeWindow.hours === null
-            ? `${state.items.length.toLocaleString()} ingested payload${state.items.length === 1 ? '' : 's'}`
-            : `${filtered.length.toLocaleString()} of ${state.items.length.toLocaleString()} payloads · ${activeWindow.label.toLowerCase()}`
+          feedFilter !== null
+            ? `${filtered.length.toLocaleString()} payload${filtered.length === 1 ? '' : 's'} · feed #${feedFilter}`
+            : activeWindow.hours === null
+              ? `${state.items.length.toLocaleString()} ingested payload${state.items.length === 1 ? '' : 's'}`
+              : `${filtered.length.toLocaleString()} of ${state.items.length.toLocaleString()} payloads · ${activeWindow.label.toLowerCase()}`
         }
         actions={
           <>
+            {feedFilter !== null && (
+              <Chip
+                active
+                onClick={() => setFeedFilter(null)}
+              >
+                Feed #{feedFilter} ✕
+              </Chip>
+            )}
             <div style={styles.search}>
               <Search size={12} strokeWidth={1.8} color="var(--ci-text-muted)" />
               <input

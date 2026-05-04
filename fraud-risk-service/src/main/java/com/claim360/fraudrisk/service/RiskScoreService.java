@@ -30,4 +30,7 @@ public interface RiskScoreService {
 
     // Delete a risk score
     void deleteRiskScore(Long scoreId);
+
+    // Auto-evaluate fraud risk from a raw ingestion payload (called by data-ingestion-service)
+    RiskScoreResponse autoEvaluateRisk(String claimId, String payloadJson);
 }

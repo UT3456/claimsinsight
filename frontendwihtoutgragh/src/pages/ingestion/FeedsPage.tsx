@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useReducer, useCallback } from 'react';
+import { useEffect, useMemo, useReducer, useCallback, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Table, Button, Modal, Form, Input, Select,
   Alert, Tooltip, Popconfirm, Dropdown,
@@ -15,24 +16,31 @@ import {
   feedsApi, FEED_TYPES, FEED_STATUSES,
   type DataFeed,
 } from '../../api/dataIngestionApi';
+import { ingestApi } from '../../api/dataIngestionApi';
 
 const { Option } = Select;
 
 /**
  * FeedsPage — reference screen #11 "Data feeds".
- * Single card wrapping the ingestion-health table. No stat tiles (reference
- * opts for a minimal toolbar — counts are implicit from the "Healthy" rows).
+ * Single card wrapping the ingestion-health table.
+ * ACTIVE feed rows expose an "Ingest" link that opens a pre-filled modal
+ * for inserting a raw claim payload into that feed.
  */
 
 // ── Reducer ──────────────────────────────────────────────────────────────────
 
 interface State {
-  items: DataFeed[];
-  loading: boolean;
-  error: string | null;
-  statusFilter: 'ALL' | 'ACTIVE' | 'INACTIVE' | 'FAILED';
-  modalOpen: boolean;
-  submitting: boolean;
+  items:           DataFeed[];
+  loading:         boolean;
+  error:           string | null;
+  statusFilter:    'ALL' | 'ACTIVE' | 'INACTIVE' | 'FAILED';
+  // register-feed modal
+  modalOpen:       boolean;
+  submitting:      boolean;
+  // ingest-claim modal
+  ingestModalOpen: boolean;
+  ingestTarget:    DataFeed | null;
+  ingesting:       boolean;
 }
 
 type Action =
@@ -45,7 +53,11 @@ type Action =
   | { type: 'SUBMIT_START' }
   | { type: 'SUBMIT_SUCCESS'; payload: DataFeed }
   | { type: 'SUBMIT_ERROR' }
-  | { type: 'DELETE'; payload: number };
+  | { type: 'DELETE'; payload: number }
+  | { type: 'OPEN_INGEST';  payload: DataFeed }
+  | { type: 'CLOSE_INGEST' }
+  | { type: 'INGEST_START' }
+  | { type: 'INGEST_DONE' };
 
 function reducer(s: State, a: Action): State {
   switch (a.type) {
@@ -59,6 +71,10 @@ function reducer(s: State, a: Action): State {
     case 'SUBMIT_SUCCESS': return { ...s, submitting: false, modalOpen: false, items: [a.payload, ...s.items] };
     case 'SUBMIT_ERROR':   return { ...s, submitting: false };
     case 'DELETE':         return { ...s, items: s.items.filter(i => i.feedId !== a.payload) };
+    case 'OPEN_INGEST':    return { ...s, ingestModalOpen: true, ingestTarget: a.payload };
+    case 'CLOSE_INGEST':   return { ...s, ingestModalOpen: false, ingestTarget: null, ingesting: false };
+    case 'INGEST_START':   return { ...s, ingesting: true };
+    case 'INGEST_DONE':    return { ...s, ingesting: false, ingestModalOpen: false, ingestTarget: null };
     default:               return s;
   }
 }
@@ -66,9 +82,9 @@ function reducer(s: State, a: Action): State {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_LABELS: Record<string, { label: string; tone: StatusTone }> = {
-  ACTIVE:   { label: 'Healthy',  tone: 'healthy' },
-  INACTIVE: { label: 'Idle',     tone: 'muted' },
-  FAILED:   { label: 'Error',    tone: 'danger' },
+  ACTIVE:   { label: 'Healthy', tone: 'healthy' },
+  INACTIVE: { label: 'Idle',    tone: 'muted'   },
+  FAILED:   { label: 'Error',   tone: 'danger'  },
 };
 
 function relativeSync(iso: string | null): { text: string; color?: string } {
@@ -76,10 +92,10 @@ function relativeSync(iso: string | null): { text: string; color?: string } {
   const then = new Date(iso).getTime();
   if (isNaN(then)) return { text: iso, color: 'var(--ci-text-muted)' };
   const diffMin = Math.max(0, Math.floor((Date.now() - then) / 60000));
-  if (diffMin < 2)   return { text: 'just now' };
-  if (diffMin < 60)  return { text: `${diffMin}m ago` };
+  if (diffMin < 2)        return { text: 'just now' };
+  if (diffMin < 60)       return { text: `${diffMin}m ago` };
   if (diffMin < 60 * 24) {
-    const hrs = Math.floor(diffMin / 60);
+    const hrs   = Math.floor(diffMin / 60);
     const color = hrs >= 4 ? 'var(--ci-warning-text)' : undefined;
     return { text: `${hrs}h ago`, color };
   }
@@ -87,15 +103,35 @@ function relativeSync(iso: string | null): { text: string; color?: string } {
   return { text: `${days}d ago`, color: 'var(--ci-warning-text)' };
 }
 
+/** Friendly display name for a feed, e.g. "feed-auto-01" */
+function feedLabel(feed: DataFeed): string {
+  return `feed-${(feed.feedType ?? 'unknown').toLowerCase()}-${String(feed.feedId).padStart(2, '0')}`;
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function FeedsPage() {
+  const navigate = useNavigate();
   const [state, dispatch] = useReducer(reducer, {
     items: [], loading: false, error: null,
     statusFilter: 'ALL',
     modalOpen: false, submitting: false,
+    ingestModalOpen: false, ingestTarget: null, ingesting: false,
   });
-  const [form] = Form.useForm();
+  const [form]       = Form.useForm();
+  const [ingestForm] = Form.useForm();
+
+  // Claim counts per feedId — loaded separately so feeds appear instantly.
+  const [claimCounts, setClaimCounts] = useState<Record<number, number>>({});
+
+  const loadCounts = useCallback(async () => {
+    try {
+      const all = await ingestApi.getAll();
+      const counts: Record<number, number> = {};
+      for (const r of all) counts[r.feedId] = (counts[r.feedId] ?? 0) + 1;
+      setClaimCounts(counts);
+    } catch { /* non-fatal — counts just stay empty */ }
+  }, []);
 
   const load = useCallback(async () => {
     dispatch({ type: 'START' });
@@ -108,8 +144,9 @@ export default function FeedsPage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); loadCounts(); }, [load, loadCounts]);
 
+  // ── Register new feed ────────────────────────────────────────────────────
   const handleCreate = async (values: Record<string, string>) => {
     dispatch({ type: 'SUBMIT_START' });
     try {
@@ -123,6 +160,29 @@ export default function FeedsPage() {
     }
   };
 
+  // ── Ingest raw claim into active feed ────────────────────────────────────
+  const handleIngest = async (values: { claimId: string; payloadJson: string }) => {
+    if (!state.ingestTarget) return;
+    const feedId = state.ingestTarget.feedId;
+    dispatch({ type: 'INGEST_START' });
+    try {
+      await ingestApi.ingest({
+        claimId:     values.claimId,
+        feedId,
+        payloadJson: values.payloadJson,
+      });
+      // Optimistically increment the claim count for this feed immediately.
+      setClaimCounts(prev => ({ ...prev, [feedId]: (prev[feedId] ?? 0) + 1 }));
+      dispatch({ type: 'INGEST_DONE' });
+      ingestForm.resetFields();
+    } catch (err) {
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to ingest claim.';
+      dispatch({ type: 'INGEST_DONE' });
+      dispatch({ type: 'ERROR', payload: msg });
+    }
+  };
+
+  // ── Delete feed ──────────────────────────────────────────────────────────
   const handleDelete = async (id: number) => {
     try {
       await feedsApi.delete(id);
@@ -140,6 +200,7 @@ export default function FeedsPage() {
 
   const activeCount = state.items.filter(i => i.status === 'ACTIVE').length;
 
+  // ── Columns ──────────────────────────────────────────────────────────────
   const columns: ColumnsType<DataFeed> = [
     {
       title: 'Feed',
@@ -180,6 +241,26 @@ export default function FeedsPage() {
       },
     },
     {
+      title: 'Claims',
+      key: 'claims',
+      width: 80,
+      align: 'right' as const,
+      render: (_: unknown, rec: DataFeed) => {
+        const count = claimCounts[rec.feedId] ?? 0;
+        if (count === 0) {
+          return <span style={{ color: 'var(--ci-text-muted)', fontSize: 11 }}>0</span>;
+        }
+        return (
+          <a
+            onClick={() => navigate(`/ingestion/raw-claims?feedId=${rec.feedId}`)}
+            style={{ fontWeight: 600, fontSize: 12, color: 'var(--ci-primary)' }}
+          >
+            {count}
+          </a>
+        );
+      },
+    },
+    {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
@@ -192,24 +273,40 @@ export default function FeedsPage() {
     {
       title: '',
       key: 'action',
-      width: '13%',
+      width: '18%',
       align: 'right',
-      render: (_, rec) => (
-        rec.status === 'FAILED'
-          ? <a onClick={() => load()} style={styles.retryLink}>Retry</a>
-          : (
-            <Popconfirm title="Delete this feed?" onConfirm={() => handleDelete(rec.feedId)}>
-              <Tooltip title="Delete">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<Trash2 size={13} strokeWidth={1.6} />}
-                  style={{ color: 'var(--ci-text-muted)' }}
-                />
-              </Tooltip>
-            </Popconfirm>
-          )
-      ),
+      render: (_, rec) => {
+        const deleteBtn = (
+          <Popconfirm title="Delete this feed?" onConfirm={() => handleDelete(rec.feedId)}>
+            <Tooltip title="Delete">
+              <Button
+                type="text"
+                size="small"
+                icon={<Trash2 size={13} strokeWidth={1.6} />}
+                style={{ color: 'var(--ci-text-muted)' }}
+              />
+            </Tooltip>
+          </Popconfirm>
+        );
+
+        if (rec.status === 'FAILED') {
+          return <a onClick={() => load()} style={styles.retryLink}>Retry</a>;
+        }
+        if (rec.status === 'ACTIVE') {
+          return (
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
+              <a
+                onClick={() => dispatch({ type: 'OPEN_INGEST', payload: rec })}
+                style={styles.ingestLink}
+              >
+                Ingest claim
+              </a>
+              {deleteBtn}
+            </div>
+          );
+        }
+        return deleteBtn;
+      },
     },
   ];
 
@@ -256,10 +353,6 @@ export default function FeedsPage() {
       )}
 
       <DataCard padding={0}>
-        {/* Three render branches:
-            1. error + no data       → centered ErrorState with retry button
-            2. no data, no error     → friendly empty state
-            3. otherwise             → the table (also handles in-flight reload of stale data) */}
         {!state.loading && state.error && filtered.length === 0 ? (
           <ErrorState
             title="Couldn't load feeds"
@@ -292,6 +385,7 @@ export default function FeedsPage() {
         )}
       </DataCard>
 
+      {/* ── Register data feed modal ───────────────────────────────────────── */}
       <Modal
         title="Register data feed"
         open={state.modalOpen}
@@ -317,12 +411,62 @@ export default function FeedsPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* ── Ingest raw claim into active feed modal ────────────────────────── */}
+      <Modal
+        title={
+          state.ingestTarget
+            ? `Ingest claim into ${feedLabel(state.ingestTarget)}`
+            : 'Ingest claim'
+        }
+        open={state.ingestModalOpen}
+        onCancel={() => { dispatch({ type: 'CLOSE_INGEST' }); ingestForm.resetFields(); }}
+        onOk={() => ingestForm.submit()}
+        confirmLoading={state.ingesting}
+        okText="Ingest claim"
+        destroyOnClose
+      >
+        <Form form={ingestForm} layout="vertical" onFinish={handleIngest}>
+          {/* Feed context — read-only so the user knows exactly where the claim lands */}
+          <Form.Item label="Feed ID">
+            <Input value={state.ingestTarget?.feedId ?? ''} disabled />
+          </Form.Item>
+          <Form.Item label="Feed type">
+            <Input value={state.ingestTarget?.feedType ?? ''} disabled />
+          </Form.Item>
+          <Form.Item label="Source system">
+            <Input value={state.ingestTarget?.sourceSystem ?? ''} disabled />
+          </Form.Item>
+
+          {/* User-provided claim fields */}
+          <Form.Item
+            name="claimId"
+            label="Claim ID"
+            rules={[{ required: true, min: 3, message: 'Claim ID must be at least 3 characters' }]}
+          >
+            <Input placeholder="CLM-2026-AUTO-001" />
+          </Form.Item>
+          <Form.Item
+            name="payloadJson"
+            label="Payload JSON"
+            rules={[{ required: true, message: 'Payload JSON is required' }]}
+          >
+            <Input.TextArea
+              rows={5}
+              placeholder='{"claimType":"Auto","amount":5000,"incidentDate":"2026-01-15"}'
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
   retryLink: {
+    color: 'var(--ci-primary)', fontWeight: 500, fontSize: 11, cursor: 'pointer',
+  },
+  ingestLink: {
     color: 'var(--ci-primary)', fontWeight: 500, fontSize: 11, cursor: 'pointer',
   },
 };

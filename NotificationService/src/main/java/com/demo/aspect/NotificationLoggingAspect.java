@@ -19,7 +19,7 @@ import java.util.Arrays;
 public class NotificationLoggingAspect {
 
     private static final String CONTROLLER_POINTCUT =
-            "execution(* com.claiminsight.notification.controller.NotificationControllerImpl.*(..))";
+            "execution(* com.demo.controller.NotificationControllerImpl.*(..))";
    //controller
 
     @Before(CONTROLLER_POINTCUT)

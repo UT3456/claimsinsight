@@ -17,7 +17,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -188,5 +191,52 @@ public class LeakageFlagServiceImpl implements LeakageFlagService {
                         "LeakageFlag", "leakageId", leakageId));
         leakageFlagRepository.delete(existing);
         log.info("LeakageFlag deleted with ID: {}", leakageId);
+    }
+
+    // ── Leakage Summary ──────────────────────────────────────────────────────────
+
+    /**
+     * Executes a {@code GROUP BY leakageType} aggregate query and returns a
+     * dashboard-ready summary: total flag count, total estimated loss, and a
+     * per-type breakdown each containing count and estimated loss.
+     *
+     * <p>Example response structure:
+     * <pre>{
+     *   "totalFlags": 12,
+     *   "totalEstimatedLoss": "145000.00",
+     *   "breakdown": [
+     *     { "leakageType": "Overpayment", "count": 8, "totalEstimatedLoss": "120000.00" },
+     *     { "leakageType": "Delay",       "count": 4, "totalEstimatedLoss":  "25000.00" }
+     *   ]
+     * }</pre></p>
+     */
+    @Override
+    public Map<String, Object> getLeakageSummaryByType() {
+        log.info("Aggregating leakage summary by type");
+        List<Object[]> rows = leakageFlagRepository.getLeakageSummaryGroupedByType();
+
+        long totalFlags = 0;
+        double totalLoss = 0;
+        List<Map<String, Object>> breakdown = new ArrayList<>();
+
+        for (Object[] row : rows) {
+            LeakageType type  = (LeakageType) row[0];
+            long count        = (Long) row[1];
+            double loss       = row[2] != null ? ((Number) row[2]).doubleValue() : 0.0;
+            totalFlags += count;
+            totalLoss  += loss;
+
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("leakageType",         type.name());
+            entry.put("count",               count);
+            entry.put("totalEstimatedLoss",  String.format("%.2f", loss));
+            breakdown.add(entry);
+        }
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("totalFlags",         totalFlags);
+        summary.put("totalEstimatedLoss", String.format("%.2f", totalLoss));
+        summary.put("breakdown",          breakdown);
+        return summary;
     }
 }

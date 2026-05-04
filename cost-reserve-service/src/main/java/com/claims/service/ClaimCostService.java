@@ -32,5 +32,7 @@ public interface ClaimCostService {
     Map<String, BigDecimal> getOverallCostSummaryByType();
     Map<String, BigDecimal> getMonthlyCostTrendByClaimId(String claimId);
     Map<String, Object> getHighestCostClaim();
+
+    java.util.Map<String, Object> autoInitializeClaim(String claimId, String payloadJson);
 }
 

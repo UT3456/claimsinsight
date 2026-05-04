@@ -7,6 +7,7 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @EnableAspectJAutoProxy
 @SpringBootApplication(scanBasePackages = "com.claims")
@@ -14,6 +15,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 @EntityScan(basePackages = "com.claims.entity")
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = "com.claims.client")
+@EnableScheduling
 public class CostReserveServiceApplication {
 
     public static void main(String[] args) {

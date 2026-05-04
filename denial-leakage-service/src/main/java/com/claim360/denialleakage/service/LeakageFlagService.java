@@ -5,6 +5,7 @@ import com.claim360.denialleakage.dto.LeakageFlagResponse;
 import com.claim360.denialleakage.enums.LeakageType;
 
 import java.util.List;
+import java.util.Map;
 
 public interface LeakageFlagService {
 
@@ -34,4 +35,10 @@ public interface LeakageFlagService {
 
     // Delete
     void deleteLeakageFlag(Long leakageId);
+
+    /**
+     * Returns a dashboard-ready rollup: total flags, total estimated loss, and a
+     * per-type breakdown grouped by {@link com.claim360.denialleakage.enums.LeakageType}.
+     */
+    Map<String, Object> getLeakageSummaryByType();
 }

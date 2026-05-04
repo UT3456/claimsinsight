@@ -1,5 +1,6 @@
 package com.claim360.denialleakage.controller;
 
+import com.claim360.denialleakage.dto.AutoAnalyzeRequest;
 import com.claim360.denialleakage.dto.DenialPatternRequest;
 import com.claim360.denialleakage.dto.DenialPatternResponse;
 import com.claim360.denialleakage.service.DenialPatternService;
@@ -99,5 +100,14 @@ public class DenialPatternController {
     public ResponseEntity<String> deleteDenialPattern(@PathVariable Long id) {
         denialPatternService.deleteDenialPattern(id);
         return ResponseEntity.ok("DenialPattern with ID " + id + " deleted successfully.");
+    }
+
+    // Auto-analyze denial patterns and leakage (called by data-ingestion-service)
+    @PostMapping("/auto-analyze")
+    public ResponseEntity<java.util.Map<String, Object>> autoAnalyze(
+            @RequestBody AutoAnalyzeRequest request) {
+        java.util.Map<String, Object> result = denialPatternService.autoAnalyzeDenial(
+                request.getClaimId(), request.getPayloadJson());
+        return ResponseEntity.status(org.springframework.http.HttpStatus.OK).body(result);
     }
 }

@@ -1,21 +1,30 @@
 package com.demo.service;
 
+import com.demo.client.NotificationServiceClient;
+import com.demo.client.dto.NotificationDispatchRequestDTO;
 import com.demo.dto.AdjusterPerformanceDTO;
 import com.demo.entities.AdjusterPerformance;
 import com.demo.exception.DatabaseOperationException;
 import com.demo.exception.InvalidInputException;
 import com.demo.exception.ResourceNotFoundException;
 import com.demo.repositories.AdjusterPerformanceRepository;
+import com.demo.repositories.SLAViolationRepository;
 import org.modelmapper.ModelMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheConfig;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Service Implementation for managing Adjuster Performance.
@@ -31,8 +40,20 @@ public class AdjusterPerformanceServiceImpl implements AdjusterPerformanceServic
     private static final double EXCELLENT_QUALITY_THRESHOLD = 90.0;
     private static final double ERROR_RATE_WEIGHT           = 1.5;
 
+    private static final Logger log = LoggerFactory.getLogger(AdjusterPerformanceServiceImpl.class);
+
+    private static final double SLA_COMPLIANCE_ALERT_THRESHOLD = 70.0;
+
     private final AdjusterPerformanceRepository repository;
     private final ModelMapper modelMapper;
+
+    /** Injected for the monthly roll-up: updates slaBreachedCount from actual violation data. */
+    @Autowired
+    private SLAViolationRepository slaViolationRepository;
+
+    /** Optional: null when NotificationService is unreachable. Alerts are non-blocking. */
+    @Autowired(required = false)
+    private NotificationServiceClient notificationServiceClient;
 
     public AdjusterPerformanceServiceImpl(AdjusterPerformanceRepository repository, ModelMapper modelMapper) {
         this.repository = repository;
@@ -369,7 +390,96 @@ public class AdjusterPerformanceServiceImpl implements AdjusterPerformanceServic
         }
     }
 
+    // ── Monthly Performance Roll-Up ──────────────────────────────────────────────
 
+    /**
+     * Runs on the 1st of every month at 04:00. For each {@link AdjusterPerformance}
+     * record it:
+     * <ol>
+     *   <li>Fetches the actual SLA breach count from the {@code sla_violation} table.</li>
+     *   <li>Derives {@code slaMetCount = claimsHandled − actualBreaches}.</li>
+     *   <li>Recomputes {@code avgTat} and {@code qualityScore} from stored raw fields.</li>
+     *   <li>Re-saves so all derived metrics are current for the new period.</li>
+     * </ol>
+     * After updating all records, calls {@link #generatePerformanceAlerts} to notify
+     * MANAGER + HR about underperforming adjusters.
+     */
+    @Scheduled(cron = "0 0 4 1 * *")
+    @CacheEvict(cacheNames = "adjusters", allEntries = true)
+    public void computeAllAdjusterPerformanceMonthly() {
+        List<AdjusterPerformance> all = repository.findAll();
+        if (all.isEmpty()) {
+            log.info("Monthly adjuster performance roll-up: no records found — skipping.");
+            return;
+        }
+        log.info("Monthly adjuster performance roll-up starting for {} record(s)...", all.size());
 
+        List<AdjusterPerformanceDTO> updatedDtos = new ArrayList<>();
+        int updated = 0;
+        for (AdjusterPerformance entity : all) {
+            try {
+                // Refresh SLA breach count from actual violation data
+                long actualBreaches = slaViolationRepository
+                        .countAllViolationsByAdjuster(entity.getAdjusterId());
+                int breachCount = (int) Math.min(actualBreaches, entity.getClaimsHandled());
+                entity.setSlaBreachedCount(breachCount);
+                entity.setSlaMetCount(Math.max(0, entity.getClaimsHandled() - breachCount));
 
+                // Recompute persistent derived fields
+                double rawAvgTat = entity.getClaimsHandled() > 0
+                        ? (double) entity.getTotalDaysTaken() / entity.getClaimsHandled() : 0.0;
+                entity.setAvgTat(Math.round(rawAvgTat * 100.0) / 100.0);
+                double rawQuality = Math.max(0,
+                        Math.min(100, 100 - (entity.getErrorRate() * ERROR_RATE_WEIGHT)));
+                entity.setQualityScore(Math.round(rawQuality * 100.0) / 100.0);
+
+                repository.save(entity);
+                updatedDtos.add(computeAndEnrich(entity));
+                updated++;
+            } catch (Exception e) {
+                log.warn("Monthly roll-up failed for adjusterId {}: {}",
+                        entity.getAdjusterId(), e.getMessage());
+            }
+        }
+        log.info("Monthly adjuster performance roll-up complete: {} of {} records updated",
+                updated, all.size());
+        generatePerformanceAlerts(updatedDtos);
+    }
+
+    /**
+     * Fires a consolidated {@code PERFORMANCE} dispatch notification to MANAGER + HR
+     * listing every adjuster whose SLA compliance is below
+     * {@value #SLA_COMPLIANCE_ALERT_THRESHOLD}% or who is flagged {@code TRAINING_REQUIRED}.
+     */
+    private void generatePerformanceAlerts(List<AdjusterPerformanceDTO> dtos) {
+        if (notificationServiceClient == null || dtos.isEmpty()) return;
+
+        List<Long> underperformers = dtos.stream()
+                .filter(d -> "TRAINING_REQUIRED".equals(d.getPerformanceFlag())
+                        || d.getSlaComplianceRate() < SLA_COMPLIANCE_ALERT_THRESHOLD)
+                .map(AdjusterPerformanceDTO::getAdjusterId)
+                .collect(Collectors.toList());
+
+        if (underperformers.isEmpty()) {
+            log.info("Monthly performance alerts: no underperformers — no notification sent.");
+            return;
+        }
+        try {
+            NotificationDispatchRequestDTO notification = NotificationDispatchRequestDTO.builder()
+                    .targetRoles(Set.of("MANAGER", "HR"))
+                    .title("Monthly Performance Alert — " + underperformers.size()
+                            + " Adjuster(s) Below Threshold")
+                    .message(underperformers.size()
+                            + " adjuster(s) are below the SLA compliance threshold or flagged for"
+                            + " training: " + underperformers + ". Review before the next period.")
+                    .category("PERFORMANCE")
+                    .referenceId("monthly-performance-roll-up")
+                    .build();
+            notificationServiceClient.dispatchNotification(notification);
+            log.info("Monthly performance alert dispatched for {} adjuster(s): {}",
+                    underperformers.size(), underperformers);
+        } catch (Exception e) {
+            log.warn("Failed to dispatch monthly performance alert: {}", e.getMessage());
+        }
+    }
 }

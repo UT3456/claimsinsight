@@ -1,5 +1,6 @@
 package com.demo.controller;
 
+import com.demo.dto.AutoGenerateSlaRequest;
 import com.demo.dto.SLAViolationDTO;
 import com.demo.service.SLAViolationService;
 import jakarta.validation.Valid;
@@ -28,6 +29,21 @@ public class SLAViolationController {
     public ResponseEntity<List<SLAViolationDTO>> getAllViolations() {
         List<SLAViolationDTO> list = service.getAllViolations();
         return ResponseEntity.ok(list);
+    }
+
+    /**
+     * Auto-generates a LOW-severity SLA tracking violation for a claim that was
+     * just ingested via data-ingestion-service. Called by that service's Feign
+     * client — not intended for manual use from the UI.
+     */
+    @PostMapping("/auto-generate")
+    public ResponseEntity<SLAViolationDTO> autoGenerate(@RequestBody AutoGenerateSlaRequest request) {
+        SLAViolationDTO result = service.autoGenerateSlaViolation(
+                request.getClaimRef(),
+                request.getAdjusterId(),
+                request.getActualDays(),
+                request.getSlaTargetDays());
+        return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 
     @PostMapping
