@@ -10,7 +10,11 @@ import java.time.LocalDate;
 
 /** JPA entity representing a KPI metric record stored in the claim_kpi table. */
 @Entity
-@Table(name = "claim_kpi")
+@Table(name = "claim_kpi", indexes = {
+    @Index(name = "idx_kpi_claim_id",     columnList = "claim_id"),
+    @Index(name = "idx_kpi_metric_name",  columnList = "metric_name"),
+    @Index(name = "idx_kpi_claim_metric", columnList = "claim_id,metric_name")
+})
 @Getter @Setter @NoArgsConstructor
 public class ClaimKPI {
 

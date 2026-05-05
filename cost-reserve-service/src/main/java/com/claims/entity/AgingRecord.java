@@ -8,7 +8,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "aging_record")
+@Table(name = "aging_record", indexes = {
+    @Index(name = "idx_ar_claim_id",     columnList = "claim_id"),
+    @Index(name = "idx_ar_aging_bucket", columnList = "aging_bucket")
+})
 @Getter
 @Setter
 @NoArgsConstructor

@@ -32,6 +32,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /** Service layer for ingesting and querying raw claim records. Results are cached in 'rawClaims'. */
@@ -90,7 +91,7 @@ public class IngestionService {
         feed.setLastSyncDate(LocalDateTime.now());
         dataFeedRepository.save(feed);
 
-        // ── Step 1 ── KPI calculation MUST run first.
+        // ── Step 1 ── KPI calculation MUST complete synchronously first.
         // fraud-risk-service's HighCost rule reads the SEVERITY KPI from
         // claims-metrics-service via Feign during auto-evaluation (step 2).
         // If KPIs are not yet persisted, SEVERITY will be missing and the rule
@@ -99,21 +100,20 @@ public class IngestionService {
         // manually via POST /api/kpis/calculate/{claimId} at any time.
         triggerKpiCalculation(request.getClaimId());
 
-        // ── Step 2 ── Fraud risk evaluation (depends on SEVERITY KPI from step 1).
-        // Passes payloadJson so HighCost + UnusualTiming rules can extract
-        // claimAmount, policyStartDate, and incidentDate without an extra DB call.
-        triggerFraudEvaluation(request.getClaimId(), request.getPayloadJson());
-
-        // ── Step 3 ── Seed ClaimCost, ClaimReserve, and AgingRecord for this claim.
-        triggerCostInitialization(request.getClaimId(), request.getPayloadJson());
-
-        // ── Step 4 ── Denial pattern analysis and leakage flag detection.
-        triggerDenialAnalysis(request.getClaimId(), request.getPayloadJson());
-
-        // ── Step 5 ── SLA violation auto-generation (last — no upstream KPI dependency).
-        // Derives actual elapsed days from incidentDate / admissionDate / filedDate
-        // in the payload so severity reflects the claim's real age.
-        triggerSlaViolation(request.getClaimId(), request.getPayloadJson());
+        // ── Steps 2–5 ── All remaining downstream triggers are independent of each
+        // other and run in parallel on the ForkJoinPool common pool.
+        // Each trigger already wraps its Feign call in a try/catch so a failure in
+        // one branch never affects the others or the ingest response.
+        final String claimId  = request.getClaimId();
+        final String payload  = request.getPayloadJson();
+        CompletableFuture<Void> fraudFuture  = CompletableFuture.runAsync(() -> triggerFraudEvaluation(claimId, payload));
+        CompletableFuture<Void> costFuture   = CompletableFuture.runAsync(() -> triggerCostInitialization(claimId, payload));
+        CompletableFuture<Void> denialFuture = CompletableFuture.runAsync(() -> triggerDenialAnalysis(claimId, payload));
+        CompletableFuture<Void> slaFuture    = CompletableFuture.runAsync(() -> triggerSlaViolation(claimId, payload));
+        // Wait for all parallel steps before returning so the caller can rely on
+        // them having been *dispatched* (each call may still fail internally, but
+        // we won't silently skip them).
+        CompletableFuture.allOf(fraudFuture, costFuture, denialFuture, slaFuture).join();
 
         log.info("Claim {} ingested, rawId: {}", request.getClaimId(), saved.getRawId());
         return claimRawMapper.toResponseDTO(saved);

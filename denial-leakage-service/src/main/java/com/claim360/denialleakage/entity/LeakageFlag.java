@@ -9,7 +9,10 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "leakage_flag")
+@Table(name = "leakage_flag", indexes = {
+    @Index(name = "idx_lf_claim_id",     columnList = "claim_id"),
+    @Index(name = "idx_lf_leakage_type", columnList = "leakage_type")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

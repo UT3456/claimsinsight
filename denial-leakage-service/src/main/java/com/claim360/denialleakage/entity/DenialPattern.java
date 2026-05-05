@@ -8,7 +8,11 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "denial_pattern")
+@Table(name = "denial_pattern", indexes = {
+    @Index(name = "idx_dp_claim_id",        columnList = "claim_id"),
+    @Index(name = "idx_dp_denial_code",     columnList = "denial_code"),
+    @Index(name = "idx_dp_occurrence_date", columnList = "occurrence_date")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

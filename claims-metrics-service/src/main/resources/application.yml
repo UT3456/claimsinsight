@@ -17,13 +17,18 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        jdbc.batch_size: 50
+        order_inserts: true
+        order_updates: true
 
   sql:
     init:
       mode: never
 
   cache:
-    type: simple
+    type: caffeine
+    caffeine:
+      spec: maximumSize=5000,expireAfterWrite=5m
 
   jackson:
     serialization:

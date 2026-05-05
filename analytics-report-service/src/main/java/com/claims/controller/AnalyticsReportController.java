@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalDouble;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @RestController
@@ -445,78 +446,95 @@ public class AnalyticsReportController {
      */
     @GetMapping("/portfolio/executive-summary")
     public ResponseEntity<Map<String, Object>> getPortfolioExecutiveSummary() {
-        log.info("Building portfolio executive summary");
+        log.info("Building portfolio executive summary (parallel fetch)");
+
+        // ── Fan out all 5 upstream calls in parallel ─────────────────────────────
+        // Each future catches its own exception and returns a safe fallback map,
+        // so a single slow/down service never blocks the others.
+        CompletableFuture<Map<String, Object>> kpiFuture = CompletableFuture.supplyAsync(() -> {
+            try {
+                List<ClaimKpiDTO> kpis = claimsMetricsServiceClient.getAllKpis();
+                Map<String, Double> avgByMetric = kpis.stream()
+                        .filter(k -> k.getMetricName() != null && k.getMetricValue() != null)
+                        .collect(Collectors.groupingBy(ClaimKpiDTO::getMetricName,
+                                Collectors.averagingDouble(k -> k.getMetricValue().doubleValue())));
+                Map<String, Object> s = new LinkedHashMap<>();
+                s.put("totalRecords",   kpis.size());
+                s.put("distinctClaims", kpis.stream().map(ClaimKpiDTO::getClaimId).filter(Objects::nonNull).distinct().count());
+                s.put("avgByMetric",    avgByMetric);
+                return s;
+            } catch (Exception ex) {
+                log.warn("claims-metrics-service unavailable for executive summary");
+                return Map.of("error", "unavailable");
+            }
+        });
+
+        CompletableFuture<Map<String, Object>> fraudFuture = CompletableFuture.supplyAsync(() -> {
+            try {
+                List<FraudRiskScoreDTO> scores = fraudRiskServiceClient.getAllRiskScores();
+                long highRisk = scores.stream().filter(s -> s.getScoreValue() != null && s.getScoreValue() >= 80.0).count();
+                OptionalDouble avg = scores.stream().filter(s -> s.getScoreValue() != null)
+                        .mapToDouble(FraudRiskScoreDTO::getScoreValue).average();
+                Map<String, Object> s = new LinkedHashMap<>();
+                s.put("totalScored",   scores.size());
+                s.put("highRiskCount", highRisk);
+                s.put("averageScore",  avg.isPresent() ? String.format("%.2f", avg.getAsDouble()) : "N/A");
+                return s;
+            } catch (Exception ex) {
+                log.warn("fraud-risk-service unavailable for executive summary");
+                return Map.of("error", "unavailable");
+            }
+        });
+
+        CompletableFuture<Map<String, Object>> leakageFuture = CompletableFuture.supplyAsync(() -> {
+            try {
+                return denialLeakageServiceClient.getLeakageSummaryByType();
+            } catch (Exception ex) {
+                log.warn("denial-leakage-service unavailable for executive summary");
+                return Map.of("error", "unavailable");
+            }
+        });
+
+        CompletableFuture<Map<String, Object>> agingFuture = CompletableFuture.supplyAsync(() -> {
+            try {
+                return costReserveAgingClient.getPortfolioAgingHealth();
+            } catch (Exception ex) {
+                log.warn("cost-reserve-service unavailable for executive summary");
+                return Map.of("error", "unavailable");
+            }
+        });
+
+        CompletableFuture<Map<String, Object>> adjFuture = CompletableFuture.supplyAsync(() -> {
+            try {
+                List<AdjusterPerformanceDTO> performers = adjusterOperationsClient.getAllAdjusterPerformance(null);
+                long trainingRequired = performers.stream()
+                        .filter(p -> "TRAINING_REQUIRED".equals(p.getPerformanceFlag())).count();
+                OptionalDouble avgSla = performers.stream()
+                        .filter(p -> p.getSlaComplianceRate() != null)
+                        .mapToDouble(AdjusterPerformanceDTO::getSlaComplianceRate).average();
+                Map<String, Object> s = new LinkedHashMap<>();
+                s.put("totalAdjusters",      performers.size());
+                s.put("trainingRequired",     trainingRequired);
+                s.put("avgSlaComplianceRate", avgSla.isPresent() ? String.format("%.1f%%", avgSla.getAsDouble()) : "N/A");
+                return s;
+            } catch (Exception ex) {
+                log.warn("AdjusterAndOperations unavailable for executive summary");
+                return Map.of("error", "unavailable");
+            }
+        });
+
+        // Wait for all futures then assemble the response
+        CompletableFuture.allOf(kpiFuture, fraudFuture, leakageFuture, agingFuture, adjFuture).join();
+
         Map<String, Object> summary = new LinkedHashMap<>();
-        summary.put("asOf", LocalDate.now().toString());
+        summary.put("asOf",               LocalDate.now().toString());
+        summary.put("kpiSummary",         kpiFuture.join());
+        summary.put("fraudRiskSummary",   fraudFuture.join());
+        summary.put("leakageSummary",     leakageFuture.join());
+        summary.put("agingHealth",        agingFuture.join());
+        summary.put("adjusterPerformance",adjFuture.join());
 
-        // ── KPI section ─────────────────────────────────────────────────────────
-        try {
-            List<ClaimKpiDTO> kpis = claimsMetricsServiceClient.getAllKpis();
-            Map<String, Double> avgByMetric = kpis.stream()
-                    .filter(k -> k.getMetricName() != null && k.getMetricValue() != null)
-                    .collect(Collectors.groupingBy(ClaimKpiDTO::getMetricName,
-                            Collectors.averagingDouble(k -> k.getMetricValue().doubleValue())));
-            Map<String, Object> kpiSection = new LinkedHashMap<>();
-            kpiSection.put("totalRecords",    kpis.size());
-            kpiSection.put("distinctClaims",  kpis.stream().map(ClaimKpiDTO::getClaimId).filter(Objects::nonNull).distinct().count());
-            kpiSection.put("avgByMetric",     avgByMetric);
-            summary.put("kpiSummary", kpiSection);
-        } catch (Exception ex) {
-            log.warn("claims-metrics-service unavailable for executive summary");
-            summary.put("kpiSummary", Map.of("error", "unavailable"));
-        }
-
-        // ── Fraud risk section ───────────────────────────────────────────────────
-        try {
-            List<FraudRiskScoreDTO> scores = fraudRiskServiceClient.getAllRiskScores();
-            long highRisk = scores.stream().filter(s -> s.getScoreValue() != null && s.getScoreValue() >= 80.0).count();
-            OptionalDouble avg = scores.stream().filter(s -> s.getScoreValue() != null)
-                    .mapToDouble(FraudRiskScoreDTO::getScoreValue).average();
-            Map<String, Object> fraudSection = new LinkedHashMap<>();
-            fraudSection.put("totalScored",    scores.size());
-            fraudSection.put("highRiskCount",  highRisk);
-            fraudSection.put("averageScore",   avg.isPresent() ? String.format("%.2f", avg.getAsDouble()) : "N/A");
-            summary.put("fraudRiskSummary", fraudSection);
-        } catch (Exception ex) {
-            log.warn("fraud-risk-service unavailable for executive summary");
-            summary.put("fraudRiskSummary", Map.of("error", "unavailable"));
-        }
-
-        // ── Leakage section ──────────────────────────────────────────────────────
-        try {
-            summary.put("leakageSummary", denialLeakageServiceClient.getLeakageSummaryByType());
-        } catch (Exception ex) {
-            log.warn("denial-leakage-service unavailable for executive summary");
-            summary.put("leakageSummary", Map.of("error", "unavailable"));
-        }
-
-        // ── Aging section ────────────────────────────────────────────────────────
-        try {
-            summary.put("agingHealth", costReserveAgingClient.getPortfolioAgingHealth());
-        } catch (Exception ex) {
-            log.warn("cost-reserve-service unavailable for executive summary");
-            summary.put("agingHealth", Map.of("error", "unavailable"));
-        }
-
-        // ── Adjuster performance section ─────────────────────────────────────────
-        try {
-            List<AdjusterPerformanceDTO> performers = adjusterOperationsClient.getAllAdjusterPerformance(null);
-            long trainingRequired = performers.stream()
-                    .filter(p -> "TRAINING_REQUIRED".equals(p.getPerformanceFlag())).count();
-            OptionalDouble avgSla = performers.stream()
-                    .filter(p -> p.getSlaComplianceRate() != null)
-                    .mapToDouble(AdjusterPerformanceDTO::getSlaComplianceRate).average();
-            Map<String, Object> adjSection = new LinkedHashMap<>();
-            adjSection.put("totalAdjusters",        performers.size());
-            adjSection.put("trainingRequired",       trainingRequired);
-            adjSection.put("avgSlaComplianceRate",   avgSla.isPresent() ? String.format("%.1f%%", avgSla.getAsDouble()) : "N/A");
-            summary.put("adjusterPerformance", adjSection);
-        } catch (Exception ex) {
-            log.warn("AdjusterAndOperations unavailable for executive summary");
-            summary.put("adjusterPerformance", Map.of("error", "unavailable"));
-        }
-
-        // ── Local report store metadata ───────────────────────────────────────────
+        // ── Local report store metadata (DB-local, no Feign — cheap) ────────────
         try {
             summary.put("reportStore", analyticsReportService.getReportDashboardSummary());
         } catch (Exception ex) {

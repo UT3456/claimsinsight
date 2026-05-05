@@ -20,8 +20,13 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        jdbc.batch_size: 50
+        order_inserts: true
+        order_updates: true
   cache:
-    type: simple
+    type: caffeine
+    caffeine:
+      spec: maximumSize=5000,expireAfterWrite=5m
   jackson:
     serialization:
       write-dates-as-timestamps: false

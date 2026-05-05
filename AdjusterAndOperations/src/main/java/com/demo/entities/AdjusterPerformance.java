@@ -12,7 +12,9 @@ import lombok.*;
 @EqualsAndHashCode
 @NoArgsConstructor
 @Entity
-@Table(name="adjuster_performance")
+@Table(name = "adjuster_performance", indexes = {
+    @Index(name = "idx_ap_adjuster_period", columnList = "adjuster_id,period")
+})
 public class AdjusterPerformance {
 
     @Id

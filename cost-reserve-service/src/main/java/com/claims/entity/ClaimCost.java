@@ -11,7 +11,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "claim_cost")
+@Table(name = "claim_cost", indexes = {
+    @Index(name = "idx_cc_claim_id",        columnList = "claim_id"),
+    @Index(name = "idx_cc_claim_cost_type", columnList = "claim_id,cost_type")
+})
 @Getter
 @Setter
 @NoArgsConstructor

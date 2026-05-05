@@ -11,6 +11,15 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
+    properties:
+      hibernate:
+        jdbc.batch_size: 50
+        order_inserts: true
+        order_updates: true
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=5000,expireAfterWrite=5m
   messages:
     basename: error
   banner:

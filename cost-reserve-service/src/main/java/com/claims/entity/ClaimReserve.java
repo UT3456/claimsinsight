@@ -10,7 +10,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "claim_reserve")
+@Table(name = "claim_reserve", indexes = {
+    @Index(name = "idx_cr_claim_id",      columnList = "claim_id"),
+    @Index(name = "idx_cr_updated_date",  columnList = "updated_date")
+})
 @Getter
 @Setter
 @NoArgsConstructor

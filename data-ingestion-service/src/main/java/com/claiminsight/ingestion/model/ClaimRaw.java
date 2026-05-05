@@ -10,7 +10,9 @@ import java.time.LocalDateTime;
 
 /** JPA entity representing a raw claim JSON payload stored in the claim_raw table. */
 @Entity
-@Table(name = "claim_raw")
+@Table(name = "claim_raw", indexes = {
+    @Index(name = "idx_claim_raw_claim_id", columnList = "claim_id")
+})
 @Getter @Setter @NoArgsConstructor
 @ToString(exclude = "dataFeed")
 public class ClaimRaw {
@@ -23,7 +25,7 @@ public class ClaimRaw {
     @Column(name = "claim_id", nullable = false, length = 100)
     private String claimId;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "feed_id", nullable = false)
     private DataFeed dataFeed;
 

@@ -8,7 +8,11 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "risk_score")
+@Table(name = "risk_score", indexes = {
+    @Index(name = "idx_rs_claim_id",      columnList = "claim_id"),
+    @Index(name = "idx_rs_score_value",   columnList = "score_value"),
+    @Index(name = "idx_rs_computed_date", columnList = "computed_date")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

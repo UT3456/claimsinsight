@@ -20,7 +20,10 @@ import java.util.Date;
 @EqualsAndHashCode
 @NoArgsConstructor
 @Entity
-@Table(name = "sla_violation")
+@Table(name = "sla_violation", indexes = {
+    @Index(name = "idx_sla_adjuster_id",    columnList = "adjuster_id"),
+    @Index(name = "idx_sla_violation_date", columnList = "violation_date")
+})
 public class SLAViolation {
 
 

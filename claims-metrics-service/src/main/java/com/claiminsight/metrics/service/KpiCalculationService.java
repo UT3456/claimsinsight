@@ -129,14 +129,19 @@ public class KpiCalculationService {
             settlementTime = cycleTime; // use cycle time as proxy when closure date is absent
         }
 
-        // ── SAVE ALL 6 KPIs ─────────────────────────────────────────────
-        List<ClaimKpiResponseDTO> savedKpis = new ArrayList<>();
-        savedKpis.add(saveKpi(claimId, MetricName.TAT,             tat,            calculatedDate));
-        savedKpis.add(saveKpi(claimId, MetricName.CYCLE_TIME,      cycleTime,      calculatedDate));
-        savedKpis.add(saveKpi(claimId, MetricName.SEVERITY,        severity,       calculatedDate));
-        savedKpis.add(saveKpi(claimId, MetricName.FREQUENCY,       frequency,      calculatedDate));
-        savedKpis.add(saveKpi(claimId, MetricName.LOSS_RATIO,      lossRatio,      calculatedDate));
-        savedKpis.add(saveKpi(claimId, MetricName.SETTLEMENT_TIME, settlementTime, calculatedDate));
+        // ── SAVE ALL 6 KPIs in a single batch INSERT ─────────────────────
+        List<ClaimKPI> kpiEntities = List.of(
+            buildKpi(claimId, MetricName.TAT,             tat,            calculatedDate),
+            buildKpi(claimId, MetricName.CYCLE_TIME,      cycleTime,      calculatedDate),
+            buildKpi(claimId, MetricName.SEVERITY,        severity,       calculatedDate),
+            buildKpi(claimId, MetricName.FREQUENCY,       frequency,      calculatedDate),
+            buildKpi(claimId, MetricName.LOSS_RATIO,      lossRatio,      calculatedDate),
+            buildKpi(claimId, MetricName.SETTLEMENT_TIME, settlementTime, calculatedDate)
+        );
+        List<ClaimKPI> saved = claimKpiRepository.saveAll(kpiEntities);
+        List<ClaimKpiResponseDTO> savedKpis = saved.stream()
+                .map(claimKpiMapper::toResponseDTO)
+                .collect(Collectors.toList());
 
         log.info("KPIs saved for claimId: {} — TAT={}, CYCLE_TIME={}, SEVERITY={}, FREQUENCY={}, LOSS_RATIO={}, SETTLEMENT_TIME={}",
                 claimId, tat, cycleTime, severity, frequency, lossRatio, settlementTime);
@@ -188,13 +193,14 @@ public class KpiCalculationService {
         }
     }
 
-    private ClaimKpiResponseDTO saveKpi(String claimId, MetricName name, BigDecimal value, LocalDate date) {
+    /** Builds a KPI entity without persisting it — used for batch saveAll(). */
+    private ClaimKPI buildKpi(String claimId, MetricName name, BigDecimal value, LocalDate date) {
         ClaimKPI kpi = new ClaimKPI();
         kpi.setClaimId(claimId);
         kpi.setMetricName(name);
         kpi.setMetricValue(value);
         kpi.setMetricDate(date);
-        return claimKpiMapper.toResponseDTO(claimKpiRepository.save(kpi));
+        return kpi;
     }
 
     // ── Nightly KPI Recompute ────────────────────────────────────────────────────

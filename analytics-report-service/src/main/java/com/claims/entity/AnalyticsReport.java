@@ -10,7 +10,12 @@ import lombok.Setter;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "analytics_report")
+@Table(name = "analytics_report", indexes = {
+    @Index(name = "idx_ar_scope",          columnList = "scope"),
+    @Index(name = "idx_ar_scope_value",    columnList = "scope_value"),
+    @Index(name = "idx_ar_generated_date", columnList = "generated_date"),
+    @Index(name = "idx_ar_generated_by",   columnList = "generated_by")
+})
 @Getter
 @Setter
 @NoArgsConstructor

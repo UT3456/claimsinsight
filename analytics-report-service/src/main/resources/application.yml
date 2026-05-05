@@ -14,6 +14,13 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
+        jdbc.batch_size: 50
+        order_inserts: true
+        order_updates: true
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=5m
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher

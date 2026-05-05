@@ -114,23 +114,24 @@ public class NotificationServiceImpl implements NotificationService {
                         return 0;
                 }
 
-                long created = 0;
+                // Build all notification entities then persist in a single batch INSERT.
+                // With hibernate.jdbc.batch_size=50 this issues one JDBC batch per 50 rows
+                // instead of one INSERT statement per recipient.
                 LocalDateTime now = LocalDateTime.now();
-                for (Long userId : recipientIds) {
-                        Notification n = Notification.builder()
-                                        .userId(userId)
-                                        .title(request.getTitle())
-                                        .message(request.getMessage())
-                                        .category(request.getCategory())
-                                        .referenceId(request.getReferenceId())
-                                        .status(NotificationStatus.UNREAD)
-                                        .createdDate(now)
-                                        .build();
-                        notificationRepository.save(n);
-                        created++;
-                }
+                List<Notification> notifications = recipientIds.stream()
+                        .map(userId -> Notification.builder()
+                                .userId(userId)
+                                .title(request.getTitle())
+                                .message(request.getMessage())
+                                .category(request.getCategory())
+                                .referenceId(request.getReferenceId())
+                                .status(NotificationStatus.UNREAD)
+                                .createdDate(now)
+                                .build())
+                        .collect(java.util.stream.Collectors.toList());
+                notificationRepository.saveAll(notifications);
 
-                return created;
+                return notifications.size();
         }
 
     @Override
