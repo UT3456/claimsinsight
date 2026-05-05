@@ -13,9 +13,12 @@ import { notificationsApi }            from '../api/notificationsApi';
  * the badge to zero — better to show stale data than hide a real alert.
  */
 
-const POLL_INTERVAL_NORMAL = 30_000;   // 30 s when healthy
+const POLL_INTERVAL_NORMAL     = 30_000;  // 30 s when healthy
 const POLL_INTERVAL_BACKED_OFF = 120_000; // 2 min when failing
-const FAILURE_THRESHOLD = 3;            // consecutive failures before backoff
+const FAILURE_THRESHOLD        = 3;       // consecutive failures before backoff
+// Delay the very first poll so it doesn't compete with Dashboard's 5 parallel
+// API calls that fire on the same mount cycle.
+const INITIAL_DELAY = 5_000; // 5 s
 
 export function useNotificationPolling(userId: number | null) {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -57,8 +60,9 @@ export function useNotificationPolling(userId: number | null) {
       }
     };
 
-    // Initial fetch immediately so the badge populates on mount.
-    fetchCount();
+    // Delay the first fetch so it does not contend with the Dashboard's
+    // parallel data requests that fire on the same render cycle.
+    timeoutId.current = setTimeout(fetchCount, INITIAL_DELAY);
 
     return () => {
       cancelled = true;

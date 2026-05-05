@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useCallback, useState } from 'react';
-import { Alert, Dropdown, Spin } from 'antd';
+import { Alert, Dropdown, Skeleton, Spin } from 'antd';
 import type { MenuProps } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, RefreshCw } from 'lucide-react';
@@ -245,39 +245,50 @@ export default function Dashboard() {
         />
       )}
 
-      {/* KPI row */}
-      <div style={styles.kpiGrid}>
-        <KpiCard
-          label="Open claims"
-          value={state.loading ? '—' : state.openClaims.toLocaleString()}
-        />
-        <KpiCard
-          label="Avg TAT (days)"
-          value={state.loading ? '—' : (state.avgTat !== null ? state.avgTat.toFixed(1) : '—')}
-          delta={state.avgTat !== null
-            ? `${(state.avgTat - 15 >= 0 ? '+' : '')}${(state.avgTat - 15).toFixed(1)}d vs 15-day SLA`
-            : undefined}
-          deltaDirection={state.avgTat !== null ? (state.avgTat > 15 ? 'up' : 'down') : undefined}
-          deltaTone={state.avgTat !== null && state.avgTat > 15 ? 'down' : 'up'}
-        />
-        <KpiCard
-          label="Loss ratio"
-          value={state.loading ? '—' : (state.lossRatio !== null ? `${state.lossRatio.toFixed(1)}%` : '—')}
-        />
-        <KpiCard
-          label="High-risk claims"
-          value={state.loading ? '—' : state.highRisk.toLocaleString()}
-          delta={state.highRisk > 0 ? `${state.highRisk} flagged ≥75` : undefined}
-          deltaTone={state.highRisk > 100 ? 'down' : undefined}
-          tone={state.highRisk > 100 ? 'warning' : 'default'}
-        />
-      </div>
+      {/* KPI row — skeleton cards during first load so the layout is visible
+          immediately rather than being blank until all 5 API calls resolve. */}
+      {state.loading ? (
+        <div style={styles.kpiGrid}>
+          {[0, 1, 2, 3].map(i => (
+            <div key={i} style={styles.skeletonCard}>
+              <Skeleton active paragraph={{ rows: 2 }} title={false} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={styles.kpiGrid}>
+          <KpiCard
+            label="Open claims"
+            value={state.openClaims.toLocaleString()}
+          />
+          <KpiCard
+            label="Avg TAT (days)"
+            value={state.avgTat !== null ? state.avgTat.toFixed(1) : '—'}
+            delta={state.avgTat !== null
+              ? `${(state.avgTat - 15 >= 0 ? '+' : '')}${(state.avgTat - 15).toFixed(1)}d vs 15-day SLA`
+              : undefined}
+            deltaDirection={state.avgTat !== null ? (state.avgTat > 15 ? 'up' : 'down') : undefined}
+            deltaTone={state.avgTat !== null && state.avgTat > 15 ? 'down' : 'up'}
+          />
+          <KpiCard
+            label="Loss ratio"
+            value={state.lossRatio !== null ? `${state.lossRatio.toFixed(1)}%` : '—'}
+          />
+          <KpiCard
+            label="High-risk claims"
+            value={state.highRisk.toLocaleString()}
+            delta={state.highRisk > 0 ? `${state.highRisk} flagged ≥75` : undefined}
+            deltaTone={state.highRisk > 100 ? 'down' : undefined}
+            tone={state.highRisk > 100 ? 'warning' : 'default'}
+          />
+        </div>
+      )}
 
       {/* Row 1 — aging buckets */}
       <div style={{ marginBottom: 12 }}>
         <DataCard title="Aging buckets" subtitle="Days since filed">
           {state.loading ? (
-            <div style={styles.chartPlaceholder}><Spin /></div>
+            <Skeleton active paragraph={{ rows: 4 }} title={false} />
           ) : state.aging.every(b => b.count === 0) ? (
             <EmptyState
               title="No aging data"
@@ -325,7 +336,7 @@ export default function Dashboard() {
           }
         >
           {state.loading ? (
-            <div style={styles.chartPlaceholder}><Spin /></div>
+            <Skeleton active paragraph={{ rows: 3 }} title={false} />
           ) : state.fraud.length === 0 ? (
             <EmptyState
               title="No risk signals"
@@ -364,7 +375,7 @@ export default function Dashboard() {
 
         <DataCard title="Denial reasons" subtitle="This month">
           {state.loading ? (
-            <div style={styles.chartPlaceholder}><Spin /></div>
+            <Skeleton active paragraph={{ rows: 4 }} title={false} />
           ) : state.denial.length === 0 ? (
             <EmptyState
               title="No denials logged"
@@ -403,6 +414,13 @@ const styles: Record<string, React.CSSProperties> = {
   kpiGrid: {
     display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
     gap: 12, marginBottom: 12,
+  },
+  skeletonCard: {
+    background: 'var(--ci-bg-surface)',
+    border: '1px solid var(--ci-border)',
+    borderRadius: 10,
+    padding: '16px 20px',
+    minHeight: 88,
   },
   twoColEq: {
     display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12,

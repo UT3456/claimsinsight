@@ -8,7 +8,10 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,
-  timeout: 15_000,
+  // 8 s gives lazy-initialising Spring services enough runway to wake up
+  // their beans on first hit, without blocking the UI for 15 s when a
+  // service is genuinely down.
+  timeout: 8_000,
   headers: { 'Content-Type': 'application/json' },
 });
 

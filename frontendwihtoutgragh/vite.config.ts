@@ -12,6 +12,30 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    // Split heavy vendor libraries into separate cached chunks so the browser
+    // can load and cache them independently. antd + recharts together are ~2 MB
+    // parsed JS — splitting them means a code change to one page doesn't bust
+    // the antd chunk that all other pages already have cached.
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          if (id.includes('antd') || id.includes('@ant-design')) return 'vendor-antd';
+          if (id.includes('recharts') || id.includes('d3-') || id.includes('d3/')
+              || id.includes('victory-vendor')) return 'vendor-charts';
+          if (id.includes('react-router') || id.includes('react-dom') || id.includes('/react/'))
+            return 'vendor-react';
+          if (id.includes('@reduxjs') || id.includes('react-redux') || id.includes('redux'))
+            return 'vendor-redux';
+          return 'vendor-misc';
+        },
+      },
+    },
+    // Don't compute brotli size during dev builds — saves ~0.5 s per build.
+    reportCompressedSize: false,
+    chunkSizeWarningLimit: 1200,
+  },
   test: {
     globals: true,
     environment: 'jsdom',
