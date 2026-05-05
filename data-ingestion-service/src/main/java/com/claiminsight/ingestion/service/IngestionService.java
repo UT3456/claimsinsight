@@ -26,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -284,7 +285,13 @@ public class IngestionService {
         }
     }
 
-    /** Returns all raw claim records. Result is cached. */
+    /**
+     * Returns all raw claim records. Result is cached.
+     * @Transactional(readOnly) keeps the Hibernate session open while the stream
+     * maps ClaimRaw → DTO so the lazy DataFeed proxy can be initialised without
+     * triggering "no session" errors.
+     */
+    @Transactional(readOnly = true)
     @Cacheable(value = "rawClaims", key = "'all'")
     public List<IngestionResponseDTO> getAllRawClaims() {
         return claimRawRepository.findAll()
@@ -292,6 +299,7 @@ public class IngestionService {
     }
 
     /** Returns raw records by claimId. Result is cached. */
+    @Transactional(readOnly = true)
     @Cacheable(value = "rawClaims", key = "#claimId")
     public List<IngestionResponseDTO> getRawClaimsByClaimId(String claimId) {
         return claimRawRepository.findByClaimId(claimId)
@@ -299,6 +307,7 @@ public class IngestionService {
     }
 
     /** Returns raw records by feedId. Throws 404 if feed does not exist. */
+    @Transactional(readOnly = true)
     @Cacheable(value = "rawClaims", key = "'feed-' + #feedId")
     public List<IngestionResponseDTO> getRawClaimsByFeedId(Long feedId) {
         if (!dataFeedRepository.existsById(feedId)) {
