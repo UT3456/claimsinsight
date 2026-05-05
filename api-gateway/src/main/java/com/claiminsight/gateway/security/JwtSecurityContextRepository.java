@@ -30,16 +30,34 @@ public class JwtSecurityContextRepository implements ServerSecurityContextReposi
 
     @Override
     public Mono<SecurityContext> load(ServerWebExchange exchange) {
-        String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-
-        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+        String token = extractToken(exchange);
+        if (token == null) {
             return Mono.empty();
         }
-
-        String token = authHeader.substring(BEARER_PREFIX.length());
-
         return jwtAuthManager
                 .authenticate(new UsernamePasswordAuthenticationToken(token, token))
                 .map(SecurityContextImpl::new);
+    }
+
+    /**
+     * Resolution order:
+     *   1. Authorization: Bearer <token>   (standard)
+     *   2. ?token=<token>                   (fallback for EventSource and
+     *      other browser APIs that cannot set custom headers)
+     *
+     * The query-param path is intentionally NOT a standalone security path —
+     * it just lets clients that physically can't send a header still attach
+     * their JWT. The token is still validated identically by JwtAuthManager.
+     */
+    private String extractToken(ServerWebExchange exchange) {
+        String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
+            return authHeader.substring(BEARER_PREFIX.length());
+        }
+        String queryToken = exchange.getRequest().getQueryParams().getFirst("token");
+        if (queryToken != null && !queryToken.isBlank()) {
+            return queryToken;
+        }
+        return null;
     }
 }

@@ -9,6 +9,10 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8086',
         changeOrigin: true,
+        // text/event-stream needs the proxy NOT to buffer responses
+        // (default behavior already streams chunks, but disabling
+        // gzip/compression at the proxy level removes any doubt).
+        ws: true,
       },
     },
   },

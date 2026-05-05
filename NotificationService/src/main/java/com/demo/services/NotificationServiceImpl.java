@@ -41,6 +41,7 @@ import java.util.stream.Collectors;
 public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final NotificationStreamService streamService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -81,6 +82,7 @@ public class NotificationServiceImpl implements NotificationService {
                 .build();
 
         Notification saved = notificationRepository.save(notification);
+        streamService.broadcast(saved);   // SSE push
         return toDTO(saved);
     }
 
@@ -129,9 +131,10 @@ public class NotificationServiceImpl implements NotificationService {
                                 .createdDate(now)
                                 .build())
                         .collect(java.util.stream.Collectors.toList());
-                notificationRepository.saveAll(notifications);
+                List<Notification> persisted = notificationRepository.saveAll(notifications);
+                streamService.broadcastAll(persisted);   // SSE push to every recipient
 
-                return notifications.size();
+                return persisted.size();
         }
 
     @Override
@@ -359,7 +362,8 @@ public class NotificationServiceImpl implements NotificationService {
                 .status(NotificationStatus.UNREAD)
                 .createdDate(LocalDateTime.now())
                 .build();
-        notificationRepository.save(n);
+        Notification saved = notificationRepository.save(n);
+        streamService.broadcast(saved);   // SSE push
     }
 
     /** Find by ID or throw a meaningful exception */

@@ -3,7 +3,7 @@ import { Badge, Popover, List, Tag, Button, Empty, Spin, Typography, Tooltip } f
 import { FiBell, FiCheck, FiCheckCircle, FiInbox } from 'react-icons/fi';
 import { useNavigate }                    from 'react-router-dom';
 import { useAuth }                        from '../../hooks/useAuth';
-import { useNotificationPolling }         from '../../hooks/useNotificationPolling';
+import { useNotificationStream }          from '../../hooks/useNotificationStream';
 import { notificationsApi }               from '../../api/notificationsApi';
 import type { Notification }              from '../../api/notificationsApi';
 
@@ -33,7 +33,7 @@ function timeAgo(iso: string): string {
 export default function NotificationBell() {
   const navigate        = useNavigate();
   const { userId }      = useAuth();
-  const { unreadCount } = useNotificationPolling(userId);
+  const { unreadCount } = useNotificationStream(userId);
 
   const [open, setOpen]       = useState(false);
   const [recent, setRecent]   = useState<Notification[]>([]);
