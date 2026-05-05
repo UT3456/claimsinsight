@@ -10,7 +10,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.time.LocalDateTime;
 import java.util.Date;
+import java.util.UUID;
 
 /**
  * Handles JWT generation and validation.
@@ -28,6 +30,9 @@ public class JwtService {
 
     @Value("${application.security.jwt.expiration}")
     private long expiration;
+
+    @Value("${application.security.jwt.refresh-expiration:604800000}")
+    private long refreshExpiration; // default 7 days
 
     // -------------------------------------------------------------------------
     // Token generation
@@ -83,6 +88,22 @@ public class JwtService {
 
     public long getExpiration() {
         return expiration;
+    }
+
+    /**
+     * Generates an opaque (non-JWT) refresh token string.
+     * The actual token value is a random UUID — the expiry is tracked in the DB row,
+     * not inside the token itself.
+     *
+     * @return raw token string to store and return to the client
+     */
+    public String generateRefreshTokenValue() {
+        return UUID.randomUUID().toString();
+    }
+
+    /** Returns the refresh token expiry as a LocalDateTime from now. */
+    public LocalDateTime refreshTokenExpiry() {
+        return LocalDateTime.now().plusSeconds(refreshExpiration / 1_000);
     }
 
     // -------------------------------------------------------------------------

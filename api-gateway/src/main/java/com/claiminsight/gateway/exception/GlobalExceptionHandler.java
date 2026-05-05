@@ -12,9 +12,18 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static org.springframework.http.HttpStatus.TOO_MANY_REQUESTS;
+
 /** Handles exceptions thrown by the gateway's own auth endpoints. */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(AccountLockedException.class)
+    public Mono<ResponseEntity<Map<String, Object>>> handleAccountLocked(AccountLockedException ex) {
+        // HTTP 429 Too Many Requests — standard response for rate-limit / lockout
+        return Mono.just(ResponseEntity.status(TOO_MANY_REQUESTS)
+                .body(errorBody(TOO_MANY_REQUESTS, ex.getMessage())));
+    }
 
     @ExceptionHandler(BadCredentialsException.class)
     public Mono<ResponseEntity<Map<String, Object>>> handleBadCredentials(BadCredentialsException ex) {

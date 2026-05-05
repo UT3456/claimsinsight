@@ -140,7 +140,8 @@ application:
   security:
     jwt:
       secret-key: 5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437
-      expiration: 86400000
+      expiration: 86400000         # 24 h access token  (reduce to 900000 = 15 min in production)
+      refresh-expiration: 604800000 # 7 days refresh token
 
 # ---- Actuator + Zipkin (single management block) --------------------------
 management:

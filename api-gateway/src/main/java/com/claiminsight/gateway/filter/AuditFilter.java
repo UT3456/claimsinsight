@@ -1,6 +1,8 @@
 package com.claiminsight.gateway.filter;
 
 import com.claiminsight.gateway.identity.service.AuditService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -24,6 +27,7 @@ import java.util.Map;
 public class AuditFilter implements GlobalFilter, Ordered {
 
     private final AuditService auditService;
+    private final ObjectMapper objectMapper;
 
     /** Maps the first URL segment (after /api/) to a human-readable resource name. */
     private static final Map<String, String> RESOURCE_NAMES = Map.ofEntries(
@@ -148,11 +152,24 @@ public class AuditFilter implements GlobalFilter, Ordered {
         return addr != null ? addr.getAddress().getHostAddress() : "unknown";
     }
 
+    /**
+     * Builds audit metadata as properly escaped JSON using Jackson.
+     * The old String.format approach broke on User-Agent strings that contain
+     * quotes, backslashes, or other JSON-special characters.
+     */
     private String buildMetadata(String method, int status, String ip, String userAgent) {
-        return String.format(
-                "{\"method\":\"%s\",\"status\":%d,\"ip\":\"%s\",\"userAgent\":\"%s\"}",
-                method, status, ip, userAgent != null ? userAgent.replace("\"", "'") : ""
-        );
+        // LinkedHashMap preserves insertion order for readable audit rows
+        Map<String, Object> meta = new LinkedHashMap<>();
+        meta.put("method",    method);
+        meta.put("status",    status);
+        meta.put("ip",        ip);
+        meta.put("userAgent", userAgent != null ? userAgent : "");
+        try {
+            return objectMapper.writeValueAsString(meta);
+        } catch (JsonProcessingException e) {
+            // Fallback — should never happen with a simple map of strings/ints
+            return "{\"method\":\"" + method + "\",\"status\":" + status + "}";
+        }
     }
 
     /** Placeholder authentication for unauthenticated (public) requests. */
