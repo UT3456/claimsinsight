@@ -60,15 +60,27 @@ public class AuditFilter implements GlobalFilter, Ordered {
         String method   = request.getMethod().name();
         String clientIp = resolveClientIp(request);
 
-        // Skip:
-        //  - /actuator and /eureka — internal noise, not useful in audit
-        //  - /api/auth/* — AuthService writes its own richer audit rows
-        //    (LOGIN_SUCCESS, LOGIN_FAILED with reason, REGISTER with role +
-        //    real userId). Without this skip, every login produced 2 rows:
-        //    one from AuthService (rich) + one from this filter (coarse).
+        // ── Skip rules ───────────────────────────────────────────────────────
+        // 1. Internal noise (actuator, eureka)
+        // 2. /api/auth/* — AuthService writes its own richer rows
         if (resource.startsWith("/actuator")
                 || resource.startsWith("/eureka")
                 || resource.startsWith("/api/auth/")) {
+            return chain.filter(exchange);
+        }
+
+        // 3. SKIP read-only GET requests for non-sensitive endpoints.
+        //    Reasons:
+        //    - Every page load fires 6-12 GETs (Dashboard parallel calls,
+        //      warmup pings, notification polling) → audit table fills
+        //      with "VIEW Risk Scores" noise inside seconds.
+        //    - Audit logs should track ACTIONS WITH CONSEQUENCES (mutations)
+        //      and SENSITIVE READS (user list, audit trail itself), not
+        //      every dashboard widget that loads.
+        //    Sensitive reads we DO keep auditing:
+        //    - /api/users           (admins listing accounts)
+        //    - /api/audit           (admins viewing the trail itself)
+        if ("GET".equals(method) && !isSensitiveRead(resource)) {
             return chain.filter(exchange);
         }
 
@@ -141,6 +153,17 @@ public class AuditFilter implements GlobalFilter, Ordered {
             case "GET":    return hasId ? "VIEW " + resourceName : "VIEW " + resourceName + "s";
             default:       return method + " " + resourceName;
         }
+    }
+
+    /**
+     * Endpoints whose READ access is itself a sensitive event worth recording —
+     * an admin pulling up the user list or scanning the audit trail.
+     * Everything else (dashboards, KPIs, claims listings) is too noisy and
+     * not security-relevant.
+     */
+    private boolean isSensitiveRead(String path) {
+        return path.startsWith("/api/users")
+            || path.startsWith("/api/audit");
     }
 
     private String resolveClientIp(ServerHttpRequest request) {
