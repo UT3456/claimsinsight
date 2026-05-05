@@ -103,6 +103,11 @@ spring:
           predicates:
             - Path=/api/risk-indicators/**
 
+        - id: fraud-risk-investigations
+          uri: lb://fraud-risk-service
+          predicates:
+            - Path=/api/investigations/**
+
         # ── Denial & Leakage Service ─────────────────────────────────────────
         - id: denial-leakage-patterns
           uri: lb://denial-leakage-service

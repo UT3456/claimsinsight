@@ -38,6 +38,20 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
     }
 
+    // ── 409 Conflict (e.g. duplicate investigation on same claim) ────────────
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException ex) {
+        log.warn("Illegal state: {}", ex.getMessage());
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.CONFLICT.value(),
+                "Conflict",
+                ex.getMessage(),
+                LocalDateTime.now()
+        );
+        return new ResponseEntity<>(error, HttpStatus.CONFLICT);
+    }
+
     // ── 400 Validation Failed ────────────────────────────────────────────────
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

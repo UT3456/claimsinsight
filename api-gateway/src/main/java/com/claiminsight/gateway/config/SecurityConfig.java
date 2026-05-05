@@ -93,6 +93,13 @@ public class SecurityConfig {
                         .pathMatchers("/api/risk-scores/**", "/api/risk-indicators/**").hasAnyAuthority(
                                 "ROLE_FRAUD_ANALYST", "ROLE_ADMIN")
 
+                        // ── SIU Investigations ──────────────────────────────────────────
+                        // Fraud Analysts open + view, Managers can also view, Admin full
+                        .pathMatchers(HttpMethod.GET, "/api/investigations/**").hasAnyAuthority(
+                                "ROLE_FRAUD_ANALYST", "ROLE_CLAIMS_MANAGER", "ROLE_ADMIN")
+                        .pathMatchers("/api/investigations/**").hasAnyAuthority(
+                                "ROLE_FRAUD_ANALYST", "ROLE_ADMIN")
+
                         // ── Denial & Leakage ────────────────────────────────────────────
                         // Claims Analysts and Fraud Analysts + Admin
                         .pathMatchers("/api/denial-patterns/**", "/api/leakage-flags/**").hasAnyAuthority(

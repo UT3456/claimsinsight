@@ -7,7 +7,7 @@ import type { ColumnsType } from 'antd/es/table';
 import type { MenuProps } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { Plus, Trash2, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ShieldAlert } from 'lucide-react';
 
 import {
   PageHeader, KpiCard, DataCard, Badge, Chip, GhostButton, EmptyState, CHART,
@@ -18,6 +18,7 @@ import {
   type CreateRiskScoreRequest, type CreateRiskIndicatorRequest,
   INDICATOR_TYPES, SEVERITIES,
 } from '../../api/fraudRiskApi';
+import { investigationsApi } from '../../api/investigationsApi';
 
 const { Option } = Select;
 
@@ -190,6 +191,29 @@ export default function FraudRiskPage() {
     }
   };
 
+  // ── Escalate SIU ──────────────────────────────────────────────────────────
+  // Opens a fraud investigation on the selected claim. Backend persists the
+  // Investigation row + dispatches a notification to FRAUD + ADMIN bells.
+  // Conflict (409) is shown as a non-fatal info — the claim already has an
+  // open investigation so no duplicate is needed.
+  const handleEscalate = async (rec: RiskScore) => {
+    try {
+      const inv = await investigationsApi.open({
+        claimId:     rec.claimId,
+        riskScoreId: rec.scoreId,
+        notes:       `Auto-escalation from risk score ${Math.round(rec.scoreValue)}.`,
+      });
+      message.success(`Escalated to SIU — investigation #${inv.investigationId} opened`);
+    } catch (err) {
+      const ax = err as { response?: { status?: number }, userMessage?: string };
+      if (ax?.response?.status === 409) {
+        message.info(ax.userMessage ?? 'This claim is already under investigation.');
+      } else {
+        message.error(ax.userMessage ?? 'Failed to escalate to SIU.');
+      }
+    }
+  };
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const periodCutoff = Date.now() - PERIOD_DAYS[state.filterPeriod] * 86_400_000;
@@ -312,19 +336,37 @@ export default function FraudRiskPage() {
       render: () => <span style={{ color: 'var(--ci-text-muted)' }}>—</span>,
     },
     {
-      title: '', key: 'action', width: '10%', align: 'right',
+      title: '', key: 'action', width: '18%', align: 'right',
       render: (_, rec) => (
-        <Popconfirm
-          title="Delete this risk score?"
-          onConfirm={async () => {
-            await riskScoresApi.delete(rec.scoreId);
-            dispatch({ type: 'DELETE_SCORE', payload: rec.scoreId });
-          }}
-        >
-          <Tooltip title="Delete">
-            <Button type="text" size="small" icon={<Trash2 size={13} strokeWidth={1.6} />} style={{ color: 'var(--ci-text-muted)' }} />
-          </Tooltip>
-        </Popconfirm>
+        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+          <Popconfirm
+            title={`Escalate claim ${rec.claimId} to SIU?`}
+            description="Opens an investigation and notifies the SIU/Fraud manager."
+            okText="Escalate"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => handleEscalate(rec)}
+          >
+            <Tooltip title="Escalate to SIU">
+              <Button
+                type="primary" danger size="small"
+                icon={<ShieldAlert size={12} strokeWidth={1.8} />}
+              >
+                Escalate
+              </Button>
+            </Tooltip>
+          </Popconfirm>
+          <Popconfirm
+            title="Delete this risk score?"
+            onConfirm={async () => {
+              await riskScoresApi.delete(rec.scoreId);
+              dispatch({ type: 'DELETE_SCORE', payload: rec.scoreId });
+            }}
+          >
+            <Tooltip title="Delete">
+              <Button type="text" size="small" icon={<Trash2 size={13} strokeWidth={1.6} />} style={{ color: 'var(--ci-text-muted)' }} />
+            </Tooltip>
+          </Popconfirm>
+        </div>
       ),
     },
   ];
