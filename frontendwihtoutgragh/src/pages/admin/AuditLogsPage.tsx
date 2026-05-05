@@ -1,7 +1,11 @@
 import { useEffect, useReducer, useCallback, useRef } from 'react';
-import { Table, Alert, DatePicker, Typography } from 'antd';
+import {
+  Table, Alert, DatePicker, Typography, Dropdown, Modal, Button, Tooltip, Popconfirm,
+  App as AntApp,
+} from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { RefreshCw, Search } from 'lucide-react';
+import type { MenuProps } from 'antd';
+import { RefreshCw, Search, Trash2, ChevronDown } from 'lucide-react';
 import dayjs from 'dayjs';
 
 import {
@@ -9,6 +13,8 @@ import {
 } from '../../components/ui';
 import type { BadgeTone } from '../../components/ui';
 import { auditApi, type AuditLog, type AuditPage } from '../../api/auditApi';
+import { canEdit } from '../../utils/roles';
+import { useAuth } from '../../hooks/useAuth';
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -78,6 +84,10 @@ function actionTone(action: string): BadgeTone {
 }
 
 export default function AuditLogsPage() {
+  const { role } = useAuth();
+  // Only admins can clear audit logs — fraud analysts have read-only access
+  const canClear = canEdit(role, '/admin/audit-logs');
+  const { message, modal } = AntApp.useApp();
   const [state, dispatch] = useReducer(reducer, {
     items: [], totalElements: 0, page: 0,
     loading: false, error: null,
@@ -141,6 +151,81 @@ export default function AuditLogsPage() {
     dispatch({ type: 'SET_MODE', payload: 'all' });
   };
 
+  // ── Clear handlers (admin-only) ────────────────────────────────────────────
+
+  const handleClearAll = () => {
+    modal.confirm({
+      title: 'Clear ALL audit logs?',
+      content:
+        `This will permanently delete every audit record (${state.totalElements.toLocaleString()} entries). ` +
+        `A single AUDIT_CLEARED marker will be left behind so the action itself is recorded. ` +
+        `This cannot be undone.`,
+      okText: 'Delete all',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancel',
+      onOk: async () => {
+        try {
+          const result = await auditApi.clearAll();
+          message.success(`Cleared ${result.removed.toLocaleString()} audit record${result.removed === 1 ? '' : 's'}`);
+          load();
+        } catch (err) {
+          const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to clear audit logs.';
+          message.error(msg);
+        }
+      },
+    });
+  };
+
+  const handlePurgeOlder = (days: number) => {
+    const cutoff = dayjs().subtract(days, 'day').format('YYYY-MM-DDTHH:mm:ss');
+    modal.confirm({
+      title: `Purge audit logs older than ${days} day${days === 1 ? '' : 's'}?`,
+      content:
+        `Removes every record before ${cutoff.replace('T', ' ')}. ` +
+        `Recent activity is preserved. An AUDIT_PURGED marker is added with the row count.`,
+      okText: 'Purge',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancel',
+      onOk: async () => {
+        try {
+          const result = await auditApi.clearOlderThan(cutoff);
+          message.success(`Purged ${result.removed.toLocaleString()} record${result.removed === 1 ? '' : 's'} older than ${days} day${days === 1 ? '' : 's'}`);
+          load();
+        } catch (err) {
+          const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to purge audit logs.';
+          message.error(msg);
+        }
+      },
+    });
+  };
+
+  const handleDeleteRow = async (id: number) => {
+    try {
+      await auditApi.deleteById(id);
+      message.success(`Audit record #${id} deleted`);
+      load();
+    } catch (err) {
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to delete record.';
+      message.error(msg);
+    }
+  };
+
+  const clearMenu: MenuProps = {
+    items: [
+      { key: '1d',  label: 'Older than 1 day' },
+      { key: '7d',  label: 'Older than 7 days' },
+      { key: '30d', label: 'Older than 30 days' },
+      { type: 'divider' },
+      { key: 'all', label: 'Clear all', danger: true },
+    ],
+    onClick: ({ key }) => {
+      if (key === 'all')      handleClearAll();
+      else if (key === '1d')  handlePurgeOlder(1);
+      else if (key === '7d')  handlePurgeOlder(7);
+      else if (key === '30d') handlePurgeOlder(30);
+    },
+  };
+
   const columns: ColumnsType<AuditLog> = [
     {
       title: 'ID', dataIndex: 'id', key: 'id', width: 70,
@@ -171,6 +256,25 @@ export default function AuditLogsPage() {
       sorter: (a, b) => a.timestamp.localeCompare(b.timestamp),
       render: v => <span style={{ color: 'var(--ci-text-secondary)' }}>{v?.replace('T', ' ').slice(0, 19)}</span>,
     },
+    ...(canClear ? [{
+      title: '',
+      key: 'action',
+      width: 50,
+      align: 'right' as const,
+      render: (_: unknown, rec: AuditLog) => (
+        <Popconfirm
+          title="Delete this audit record?"
+          description="This action cannot be undone."
+          onConfirm={() => handleDeleteRow(rec.id)}
+          okText="Delete"
+          okButtonProps={{ danger: true }}
+        >
+          <Tooltip title="Delete">
+            <Button type="text" size="small" icon={<Trash2 size={13} strokeWidth={1.6} />} style={{ color: 'var(--ci-text-muted)' }} />
+          </Tooltip>
+        </Popconfirm>
+      ),
+    }] : []),
   ];
 
   return (
@@ -179,9 +283,18 @@ export default function AuditLogsPage() {
         title="Audit log"
         subtitle={`${state.totalElements.toLocaleString()} record${state.totalElements === 1 ? '' : 's'} · full action trail`}
         actions={
-          <GhostButton onClick={handleReset} icon={<RefreshCw size={12} strokeWidth={1.8} />}>
-            Reset
-          </GhostButton>
+          <>
+            <GhostButton onClick={handleReset} icon={<RefreshCw size={12} strokeWidth={1.8} />}>
+              Reset
+            </GhostButton>
+            {canClear && (
+              <Dropdown menu={clearMenu} trigger={['click']}>
+                <Button danger size="small" icon={<Trash2 size={12} strokeWidth={1.8} />}>
+                  Clear <ChevronDown size={11} strokeWidth={1.8} />
+                </Button>
+              </Dropdown>
+            )}
+          </>
         }
       />
 
