@@ -1,17 +1,16 @@
 import { useEffect, useMemo, useReducer, useCallback } from 'react';
 import {
-  Table, Modal, Form, Input, Alert, Tooltip, Popconfirm, Button, Row, Col,
-  App as AntApp,
+  Table, Alert, Tooltip, Popconfirm, Button,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { RefreshCw, Plus, Trash2, Trophy, Search } from 'lucide-react';
+import { RefreshCw, Trash2, Trophy, Search } from 'lucide-react';
 
 import {
   PageHeader, KpiCard, DataCard, Badge, Chip, StatusDot, TintedAvatar,
-  GhostButton, DarkButton, EmptyState, CHART,
+  GhostButton, EmptyState, CHART,
 } from '../../components/ui';
 import type { BadgeTone, StatusTone } from '../../components/ui';
-import { adjustersApi, type AdjusterPerformance, type CreateAdjusterRequest } from '../../api/adjustersApi';
+import { adjustersApi, type AdjusterPerformance } from '../../api/adjustersApi';
 
 /**
  * AdjustersPage — reference screen #06.
@@ -24,8 +23,6 @@ interface State {
   items: AdjusterPerformance[];
   loading: boolean;
   error: string | null;
-  modalOpen: boolean;
-  submitting: boolean;
   period: string;
   tierFilter: 'ALL' | 'TOP' | 'MID' | 'LOW';
   search: string;
@@ -35,11 +32,6 @@ type Action =
   | { type: 'FETCH_START' }
   | { type: 'FETCH_SUCCESS'; payload: AdjusterPerformance[] }
   | { type: 'FETCH_ERROR'; payload: string }
-  | { type: 'OPEN_MODAL' }
-  | { type: 'CLOSE_MODAL' }
-  | { type: 'SUBMIT_START' }
-  | { type: 'SUBMIT_SUCCESS'; payload: AdjusterPerformance }
-  | { type: 'SUBMIT_ERROR' }
   | { type: 'DELETE'; payload: number }
   | { type: 'SET_PERIOD'; payload: string }
   | { type: 'SET_TIER'; payload: State['tierFilter'] }
@@ -47,19 +39,14 @@ type Action =
 
 function reducer(s: State, a: Action): State {
   switch (a.type) {
-    case 'FETCH_START':    return { ...s, loading: true, error: null };
-    case 'FETCH_SUCCESS':  return { ...s, loading: false, items: a.payload };
-    case 'FETCH_ERROR':    return { ...s, loading: false, error: a.payload };
-    case 'OPEN_MODAL':     return { ...s, modalOpen: true };
-    case 'CLOSE_MODAL':    return { ...s, modalOpen: false, submitting: false };
-    case 'SUBMIT_START':   return { ...s, submitting: true };
-    case 'SUBMIT_SUCCESS': return { ...s, submitting: false, modalOpen: false, items: [...s.items, a.payload] };
-    case 'SUBMIT_ERROR':   return { ...s, submitting: false };
-    case 'DELETE':         return { ...s, items: s.items.filter(i => i.perfId !== a.payload) };
-    case 'SET_PERIOD':     return { ...s, period: a.payload };
-    case 'SET_TIER':       return { ...s, tierFilter: a.payload };
-    case 'SET_SEARCH':     return { ...s, search: a.payload };
-    default:               return s;
+    case 'FETCH_START':   return { ...s, loading: true, error: null };
+    case 'FETCH_SUCCESS': return { ...s, loading: false, items: a.payload };
+    case 'FETCH_ERROR':   return { ...s, loading: false, error: a.payload };
+    case 'DELETE':        return { ...s, items: s.items.filter(i => i.perfId !== a.payload) };
+    case 'SET_PERIOD':    return { ...s, period: a.payload };
+    case 'SET_TIER':      return { ...s, tierFilter: a.payload };
+    case 'SET_SEARCH':    return { ...s, search: a.payload };
+    default:              return s;
   }
 }
 
@@ -85,11 +72,9 @@ function flagMeta(flag: string): { tone: BadgeTone; status: StatusTone } {
 
 export default function AdjustersPage() {
   const [state, dispatch] = useReducer(reducer, {
-    items: [], loading: false, error: null, modalOpen: false, submitting: false,
+    items: [], loading: false, error: null,
     period: '', tierFilter: 'ALL', search: '',
   });
-  const [form] = Form.useForm();
-  const { message } = AntApp.useApp();
 
   const load = useCallback(async () => {
     dispatch({ type: 'FETCH_START' });
@@ -102,29 +87,6 @@ export default function AdjustersPage() {
   }, [state.period]);
 
   useEffect(() => { load(); }, [load]);
-
-  const handleCreate = async (values: Record<string, unknown>) => {
-    dispatch({ type: 'SUBMIT_START' });
-    try {
-      const req: CreateAdjusterRequest = {
-        adjusterId:       Number(values.adjusterId),
-        claimsHandled:    Number(values.claimsHandled ?? 0),
-        totalDaysTaken:   Number(values.totalDaysTaken ?? 0),
-        slaMetCount:      Number(values.slaMetCount ?? 0),
-        slaBreachedCount: Number(values.slaBreachedCount ?? 0),
-        deniedClaimsCount:Number(values.deniedClaimsCount ?? 0),
-        errorRate:        Number(values.errorRate ?? 0),
-        period:           values.period as string,
-      };
-      dispatch({ type: 'SUBMIT_SUCCESS', payload: await adjustersApi.create(req) });
-      form.resetFields();
-      message.success('Adjuster record added');
-    } catch (err) {
-      dispatch({ type: 'SUBMIT_ERROR' });
-      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to add adjuster record.';
-      message.error(msg);
-    }
-  };
 
   const handleDelete = async (id: number) => {
     await adjustersApi.delete(id);
@@ -252,9 +214,6 @@ export default function AdjustersPage() {
             <GhostButton onClick={load} icon={<RefreshCw size={12} strokeWidth={1.8} />}>
               Refresh
             </GhostButton>
-            <DarkButton onClick={() => dispatch({ type: 'OPEN_MODAL' })} icon={<Plus size={12} strokeWidth={2} />}>
-              Add record
-            </DarkButton>
           </>
         }
       />
@@ -315,30 +274,6 @@ export default function AdjustersPage() {
           />
         )}
       </DataCard>
-
-      <Modal
-        title="Add performance record"
-        open={state.modalOpen}
-        onCancel={() => { dispatch({ type: 'CLOSE_MODAL' }); form.resetFields(); }}
-        onOk={() => form.submit()}
-        confirmLoading={state.submitting}
-        okText="Add record"
-        destroyOnClose
-        width={560}
-      >
-        <Form form={form} layout="vertical" onFinish={handleCreate}>
-          <Row gutter={12}>
-            <Col span={12}><Form.Item name="adjusterId" label="Adjuster ID" rules={[{ required: true }]}><Input type="number" min={1} /></Form.Item></Col>
-            <Col span={12}><Form.Item name="period" label="Period" rules={[{ required: true }]}><Input placeholder="Q1-2024" /></Form.Item></Col>
-            <Col span={12}><Form.Item name="claimsHandled"    label="Claims handled"    ><Input type="number" min={0} defaultValue={0} /></Form.Item></Col>
-            <Col span={12}><Form.Item name="totalDaysTaken"   label="Total days taken"  ><Input type="number" min={0} defaultValue={0} /></Form.Item></Col>
-            <Col span={12}><Form.Item name="slaMetCount"      label="SLA met count"     ><Input type="number" min={0} defaultValue={0} /></Form.Item></Col>
-            <Col span={12}><Form.Item name="slaBreachedCount" label="SLA breached"      ><Input type="number" min={0} defaultValue={0} /></Form.Item></Col>
-            <Col span={12}><Form.Item name="deniedClaimsCount" label="Denied claims"    ><Input type="number" min={0} defaultValue={0} /></Form.Item></Col>
-            <Col span={12}><Form.Item name="errorRate"        label="Error rate (%)"    ><Input type="number" min={0} max={100} defaultValue={0} /></Form.Item></Col>
-          </Row>
-        </Form>
-      </Modal>
     </div>
   );
 }

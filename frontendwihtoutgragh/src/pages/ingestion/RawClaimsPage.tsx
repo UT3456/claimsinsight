@@ -1,18 +1,17 @@
 import { useEffect, useMemo, useReducer, useCallback, useState } from 'react';
 import {
-  Table, Button, Modal, Form, Input, Alert, Tooltip, Popconfirm, Typography, Dropdown,
+  Table, Button, Alert, Tooltip, Popconfirm, Typography, Dropdown,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { MenuProps } from 'antd';
-import { Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import { RefreshCw, Search, Trash2, X } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import {
-  PageHeader, DataCard, DarkButton, GhostButton, EmptyState, Badge, Chip,
+  PageHeader, DataCard, GhostButton, EmptyState, Badge, Chip,
 } from '../../components/ui';
 import {
   ingestApi,
-  type IngestRequest,
   type RawClaim,
 } from '../../api/dataIngestionApi';
 
@@ -36,8 +35,6 @@ interface State {
   items: RawClaim[];
   loading: boolean;
   error: string | null;
-  modalOpen: boolean;
-  submitting: boolean;
   searchClaimId: string;
   windowKey: WindowKey;
 }
@@ -46,29 +43,19 @@ type Action =
   | { type: 'START' }
   | { type: 'SUCCESS'; payload: RawClaim[] }
   | { type: 'ERROR'; payload: string }
-  | { type: 'OPEN_MODAL' }
-  | { type: 'CLOSE_MODAL' }
-  | { type: 'SUBMIT_START' }
-  | { type: 'SUBMIT_SUCCESS'; payload: RawClaim }
-  | { type: 'SUBMIT_ERROR' }
   | { type: 'DELETE'; payload: number }
   | { type: 'SET_SEARCH'; payload: string }
   | { type: 'SET_WINDOW'; payload: WindowKey };
 
 function reducer(s: State, a: Action): State {
   switch (a.type) {
-    case 'START':          return { ...s, loading: true, error: null };
-    case 'SUCCESS':        return { ...s, loading: false, items: a.payload };
-    case 'ERROR':          return { ...s, loading: false, error: a.payload };
-    case 'OPEN_MODAL':     return { ...s, modalOpen: true };
-    case 'CLOSE_MODAL':    return { ...s, modalOpen: false, submitting: false };
-    case 'SUBMIT_START':   return { ...s, submitting: true };
-    case 'SUBMIT_SUCCESS': return { ...s, submitting: false, modalOpen: false, items: [a.payload, ...s.items] };
-    case 'SUBMIT_ERROR':   return { ...s, submitting: false };
-    case 'DELETE':         return { ...s, items: s.items.filter(i => i.rawId !== a.payload) };
-    case 'SET_SEARCH':     return { ...s, searchClaimId: a.payload };
-    case 'SET_WINDOW':     return { ...s, windowKey: a.payload };
-    default:               return s;
+    case 'START':      return { ...s, loading: true, error: null };
+    case 'SUCCESS':    return { ...s, loading: false, items: a.payload };
+    case 'ERROR':      return { ...s, loading: false, error: a.payload };
+    case 'DELETE':     return { ...s, items: s.items.filter(i => i.rawId !== a.payload) };
+    case 'SET_SEARCH': return { ...s, searchClaimId: a.payload };
+    case 'SET_WINDOW': return { ...s, windowKey: a.payload };
+    default:           return s;
   }
 }
 
@@ -77,10 +64,9 @@ export default function RawClaimsPage() {
   const [searchParams] = useSearchParams();
 
   const [state, dispatch] = useReducer(reducer, {
-    items: [], loading: false, error: null, modalOpen: false, submitting: false,
+    items: [], loading: false, error: null,
     searchClaimId: '', windowKey: 'all',
   });
-  const [form] = Form.useForm();
 
   // ?feedId=N — set when navigating here from the Data Feeds "Claims" count link.
   const [feedFilter, setFeedFilter] = useState<number | null>(() => {
@@ -128,26 +114,6 @@ export default function RawClaimsPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  const handleIngest = async (values: Omit<IngestRequest, 'feedId'> & { feedId: string }) => {
-    dispatch({ type: 'SUBMIT_START' });
-    try {
-      const record = await ingestApi.ingest({
-        claimId:     values.claimId,
-        feedId:      Number(values.feedId),
-        payloadJson: values.payloadJson,
-      });
-      dispatch({ type: 'SUBMIT_SUCCESS', payload: record });
-      form.resetFields();
-    } catch (err) {
-      // The most common ingest failure is feeding into a non-ACTIVE source —
-      // the BE returns a clear 400 message via InvalidFeedStatusException.
-      // Surface it via the page-level Alert (close modal so user can read it).
-      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to ingest claim.';
-      dispatch({ type: 'SUBMIT_ERROR' });
-      dispatch({ type: 'ERROR', payload: msg });
-    }
-  };
 
   const handleDelete = async (id: number) => {
     try {
@@ -266,12 +232,6 @@ export default function RawClaimsPage() {
             <GhostButton onClick={() => load()} icon={<RefreshCw size={12} strokeWidth={1.8} />}>
               Refresh
             </GhostButton>
-            <DarkButton
-              onClick={() => dispatch({ type: 'OPEN_MODAL' })}
-              icon={<Plus size={12} strokeWidth={2} />}
-            >
-              Ingest claim
-            </DarkButton>
           </>
         }
       />
@@ -304,7 +264,7 @@ export default function RawClaimsPage() {
                 ? <GhostButton onClick={() => { dispatch({ type: 'SET_SEARCH', payload: '' }); load(); }}>Clear search</GhostButton>
                 : activeWindow.hours !== null && state.items.length > 0
                   ? <GhostButton onClick={() => dispatch({ type: 'SET_WINDOW', payload: 'all' })}>Show all time</GhostButton>
-                  : <DarkButton onClick={() => dispatch({ type: 'OPEN_MODAL' })}>Ingest claim</DarkButton>
+                  : undefined
             }
           />
         ) : (
@@ -318,28 +278,6 @@ export default function RawClaimsPage() {
           />
         )}
       </DataCard>
-
-      <Modal
-        title="Ingest raw claim"
-        open={state.modalOpen}
-        onCancel={() => { dispatch({ type: 'CLOSE_MODAL' }); form.resetFields(); }}
-        onOk={() => form.submit()}
-        confirmLoading={state.submitting}
-        okText="Ingest"
-        destroyOnClose
-      >
-        <Form form={form} layout="vertical" onFinish={handleIngest}>
-          <Form.Item name="claimId" label="Claim ID" rules={[{ required: true, min: 3 }]}>
-            <Input placeholder="CLM-2026-AUTO-001" />
-          </Form.Item>
-          <Form.Item name="feedId" label="Feed ID" rules={[{ required: true }]}>
-            <Input type="number" placeholder="1" min={1} />
-          </Form.Item>
-          <Form.Item name="payloadJson" label="Payload JSON" rules={[{ required: true }]}>
-            <Input.TextArea rows={5} placeholder='{"claimType":"Auto","amount":5000}' />
-          </Form.Item>
-        </Form>
-      </Modal>
     </div>
   );
 }
