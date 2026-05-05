@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
-import { store }            from '../store';
-import { clearCredentials } from '../store/slices/authSlice';
+import { store }                        from '../store';
+import { clearCredentials, setCredentials } from '../store/slices/authSlice';
 
 // Use env var if set (production), otherwise fall back to '/api' which
 // the Vite dev proxy forwards to http://localhost:8086 — avoids CORS in dev.
@@ -47,27 +47,72 @@ export function getApiErrorMessage(err: unknown): string {
   return ax?.message || 'Something went wrong.';
 }
 
+// ── Token refresh state — prevent concurrent refresh storms ────────────────
+let isRefreshing = false;
+let pendingQueue: Array<{ resolve: (token: string) => void; reject: (err: unknown) => void }> = [];
+
+function flushQueue(token: string | null, err: unknown = null) {
+  pendingQueue.forEach(p => token ? p.resolve(token) : p.reject(err));
+  pendingQueue = [];
+}
+
 // ── Response interceptor — normalize errors, handle auth ───────────────────
 axiosInstance.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
+  async (error: AxiosError) => {
     const status = error.response?.status;
+    const originalRequest = error.config as any;
 
-    if (status === 401) {
-      store.dispatch(clearCredentials());
-      // Avoid redirect loop if we're already on /login.
-      // Preserve the intended path + search so the user lands back where
-      // they were after re-login, instead of always defaulting to /dashboard.
-      const path = window.location.pathname;
-      if (!path.startsWith('/login')) {
-        try {
-          const intended = path + window.location.search + window.location.hash;
-          // Skip the placeholder "/" so we don't bounce to dashboard via redirect.
-          if (intended && intended !== '/') {
-            sessionStorage.setItem('ci360.redirectAfterLogin', intended);
-          }
-        } catch { /* sessionStorage may be unavailable in some embedded contexts */ }
-        window.location.href = '/login';
+    if (status === 401 && !originalRequest?._retry) {
+      // Don't attempt refresh on the auth endpoints themselves
+      const url = originalRequest?.url ?? '';
+      if (url.includes('/auth/login') || url.includes('/auth/refresh')) {
+        store.dispatch(clearCredentials());
+        redirectToLogin();
+        (error as any).userMessage = getApiErrorMessage(error);
+        return Promise.reject(error);
+      }
+
+      // Try to use the refresh token to get a new access token silently
+      const refreshToken = localStorage.getItem('ci360_refresh');
+      if (!refreshToken) {
+        store.dispatch(clearCredentials());
+        redirectToLogin();
+        (error as any).userMessage = getApiErrorMessage(error);
+        return Promise.reject(error);
+      }
+
+      if (isRefreshing) {
+        // Another request already triggered a refresh — queue this one
+        return new Promise((resolve, reject) => {
+          pendingQueue.push({
+            resolve: (token) => {
+              originalRequest.headers['Authorization'] = `Bearer ${token}`;
+              resolve(axiosInstance(originalRequest));
+            },
+            reject,
+          });
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const { data } = await axiosInstance.post('/auth/refresh', { refreshToken });
+        store.dispatch(setCredentials(data));
+        const newToken = data.accessToken as string;
+        axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+        originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+        flushQueue(newToken);
+        return axiosInstance(originalRequest);
+      } catch (refreshErr) {
+        flushQueue(null, refreshErr);
+        store.dispatch(clearCredentials());
+        redirectToLogin();
+        return Promise.reject(refreshErr);
+      } finally {
+        isRefreshing = false;
       }
     }
 
@@ -77,5 +122,18 @@ axiosInstance.interceptors.response.use(
     return Promise.reject(error);
   },
 );
+
+function redirectToLogin() {
+  const path = window.location.pathname;
+  if (!path.startsWith('/login')) {
+    try {
+      const intended = path + window.location.search + window.location.hash;
+      if (intended && intended !== '/') {
+        sessionStorage.setItem('ci360.redirectAfterLogin', intended);
+      }
+    } catch { /* sessionStorage may be unavailable */ }
+    window.location.href = '/login';
+  }
+}
 
 export default axiosInstance;

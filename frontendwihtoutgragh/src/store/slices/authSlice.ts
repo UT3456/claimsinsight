@@ -2,8 +2,9 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { AuthResponse }          from '../../types/auth.types';
 import { getUserIdFromToken }         from '../../utils/tokenUtils';
 
-const TOKEN_KEY = 'ci360_token';
-const USER_KEY  = 'ci360_user';
+const TOKEN_KEY   = 'ci360_token';
+const REFRESH_KEY = 'ci360_refresh';
+const USER_KEY    = 'ci360_user';
 
 interface AuthState {
   token:           string | null;
@@ -34,7 +35,7 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     setCredentials(state, action: PayloadAction<AuthResponse>) {
-      const { accessToken, username, role, expiresIn } = action.payload;
+      const { accessToken, refreshToken, username, role, expiresIn } = action.payload;
       const userId = getUserIdFromToken(accessToken);
 
       state.token           = accessToken;
@@ -46,6 +47,7 @@ const authSlice = createSlice({
 
       localStorage.setItem(TOKEN_KEY, accessToken);
       localStorage.setItem(USER_KEY, JSON.stringify({ username, role, userId, expiresIn }));
+      if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken);
     },
     clearCredentials(state) {
       state.token           = null;
@@ -56,6 +58,7 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
 
       localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(REFRESH_KEY);
       localStorage.removeItem(USER_KEY);
     },
   },
