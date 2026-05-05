@@ -32,7 +32,9 @@ foreach ($service in $services) {
         Write-Host "Starting $serviceName (Port: $port)..." -ForegroundColor Green
 
         # Start in a new PowerShell window
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$servicePath'; Write-Host 'Starting $serviceName on port $port...'; mvn spring-boot:run" -WindowStyle Normal
+        # JAVA_TOOL_OPTIONS: -XX:TieredStopAtLevel=1 skips full JIT (C2 compiler) for ~2x faster startup
+        # at cost of slower runtime throughput — ideal for dev. Remove for production.
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$servicePath'; Write-Host 'Starting $serviceName on port $port...'; `$env:JAVA_TOOL_OPTIONS='-XX:TieredStopAtLevel=1 -Xms64m'; mvn spring-boot:run" -WindowStyle Normal
 
         # Small delay to prevent overwhelming the system
         Start-Sleep -Seconds 2

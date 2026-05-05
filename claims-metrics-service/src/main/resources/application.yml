@@ -11,6 +11,14 @@ spring:
     name: claims-metrics-service
   profiles:
     default: dev
+  main:
+    banner-mode: off
+    # NOTE: lazy-initialization intentionally omitted — @Scheduled beans must be eager
+  datasource:
+    hikari:
+      minimum-idle: 2
+      maximum-pool-size: 5
+      connection-timeout: 20000
 
   jpa:
     show-sql: true
@@ -41,8 +49,12 @@ eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka/
+    registry-fetch-interval-seconds: 5
+    initial-instance-info-replication-interval-seconds: 5
   instance:
     prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 20
 
 # ---- Actuator + Zipkin (single management block) --------------------------
 management:
@@ -63,7 +75,7 @@ management:
       endpoint: http://localhost:9411/api/v2/spans
   tracing:
     sampling:
-      probability: 1.0
+      probability: 0.1
 
 info:
   app:

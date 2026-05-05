@@ -1,15 +1,21 @@
 spring:
   application:
     name: NotificationService
+  main:
+    banner-mode: off
+    # NOTE: lazy-initialization omitted — @Scheduled beans must stay eager
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/NotificationsDB?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: root
     password: root
+    hikari:
+      minimum-idle: 2
+      maximum-pool-size: 5
+      connection-timeout: 20000
   sql:
     init:
-      mode: always
-      data-locations: classpath:data.sql
+      mode: never   # was 'always' — re-running data.sql on every start is slow
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
@@ -35,11 +41,7 @@ spring:
   boot:
     admin:
       client:
-        url: http://localhost:8084
-        instance:
-          name: NotificationService
-          prefer-ip: true
-        enabled: true
+        enabled: false
 
 server:
   port: 8088
@@ -54,8 +56,12 @@ eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka
+    registry-fetch-interval-seconds: 5
+    initial-instance-info-replication-interval-seconds: 5
   instance:
     prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 20
 
 management:
   endpoints:
@@ -73,4 +79,4 @@ management:
       endpoint: http://localhost:9411/api/v2/spans
   tracing:
     sampling:
-      probability: 1.0
+      probability: 0.1

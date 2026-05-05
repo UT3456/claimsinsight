@@ -1,11 +1,18 @@
 spring:
   application:
     name: analytics-report-service
+  main:
+    lazy-initialization: true
+    banner-mode: off
   datasource:
     url: jdbc:mysql://localhost:3306/claims_analytics_report_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: root
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      minimum-idle: 2
+      maximum-pool-size: 5
+      connection-timeout: 20000
   jpa:
     hibernate:
       ddl-auto: update
@@ -30,14 +37,18 @@ server:
 
 logging:
   level:
-    com.claims: DEBUG
+    com.claims: INFO
 
 eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka
+    registry-fetch-interval-seconds: 5
+    initial-instance-info-replication-interval-seconds: 5
   instance:
     prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 20
 
 management:
   endpoints:
@@ -55,4 +66,4 @@ management:
       endpoint: http://localhost:9411/api/v2/spans
   tracing:
     sampling:
-      probability: 1.0
+      probability: 0.1

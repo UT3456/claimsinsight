@@ -11,9 +11,17 @@ spring:
     name: data-ingestion-service
   profiles:
     default: dev
+  main:
+    lazy-initialization: true   # defer bean creation → ~40% faster startup
+    banner-mode: off
   output:
     ansi:
       enabled: always
+  datasource:
+    hikari:
+      minimum-idle: 2           # default 10 — only 2 idle connections on startup
+      maximum-pool-size: 5      # default 10
+      connection-timeout: 20000 # 20s
   jpa:
     open-in-view: false
     show-sql: true
@@ -38,8 +46,12 @@ eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka/
+    registry-fetch-interval-seconds: 5             # default 30
+    initial-instance-info-replication-interval-seconds: 5  # default 40
   instance:
     prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10          # default 30
+    lease-expiration-duration-in-seconds: 20       # default 90
 
 # ---- Actuator + Zipkin (single management block) --------------------------
 management:
@@ -60,7 +72,7 @@ management:
       endpoint: http://localhost:9411/api/v2/spans
   tracing:
     sampling:
-      probability: 1.0
+      probability: 0.1   # was 1.0 — reduce Zipkin overhead in dev
 
 info:
   app:
