@@ -1,36 +1,28 @@
 import { useEffect, useMemo, useReducer, useCallback } from 'react';
-import { Table, Alert, Tooltip, Button, Typography } from 'antd';
+import {
+  Table, Alert, Tooltip, Button, Typography, Dropdown, Popconfirm, Switch,
+  App as AntApp,
+} from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { MoreHorizontal, Plus, Search } from 'lucide-react';
+import type { MenuProps } from 'antd';
+import { MoreHorizontal, Search, RefreshCw, Trash2 } from 'lucide-react';
 
 import {
-  PageHeader, DataCard, Badge, DarkButton, EmptyState, TintedAvatar,
+  PageHeader, DataCard, Badge, GhostButton, EmptyState, TintedAvatar,
 } from '../../components/ui';
 import type { BadgeTone } from '../../components/ui';
-import { auditApi, type AuditLog } from '../../api/auditApi';
+import { usersApi, type User } from '../../api/usersApi';
 import { ROLE_LABELS, ROLES, type AppRole } from '../../utils/roles';
+import { useAuth } from '../../hooks/useAuth';
 
 const { Text } = Typography;
 
 /**
- * UsersRolesPage — reference screen #13 "Users & roles".
- *
- * We don't yet have a dedicated /users API, so the table is assembled from
- * the most-recent audit log entries (one row per distinct username). The
- * role column shows an educated guess based on username heuristics where
- * the audit log doesn't expose role directly. When the users API ships,
- * swap the data source — the table shape stays the same.
+ * UsersRolesPage — backed by the gateway's /api/users endpoints.
+ * Admins can: list, change role, enable/disable, and delete users.
+ * Self-deletion is blocked server-side AND in the UI.
  */
 
-interface UserRow {
-  username: string;
-  email: string;
-  role: AppRole;
-  status: 'Active' | 'Invited' | 'Suspended';
-  lastActive: string;
-}
-
-// Persona-based role tones matching the reference.
 const ROLE_TONE: Record<AppRole, BadgeTone> = {
   [ROLES.CLAIMS_ANALYST]:   'teal',
   [ROLES.CLAIMS_MANAGER]:   'blue',
@@ -40,44 +32,8 @@ const ROLE_TONE: Record<AppRole, BadgeTone> = {
   [ROLES.ADMIN]:            'neutral',
 };
 
-const STATUS_TONE: Record<UserRow['status'], BadgeTone> = {
-  Active:    'green',
-  Invited:   'amber',
-  Suspended: 'red',
-};
-
-// ── Heuristics to derive email + role from a username ────────────────────────
-
-function guessEmail(username: string): string {
-  const slug = username.toLowerCase().replace(/[^a-z0-9.]/g, '.');
-  return `${slug}@acme.com`;
-}
-
-function guessRole(username: string): AppRole {
-  const u = username.toLowerCase();
-  if (u.includes('admin'))   return ROLES.ADMIN;
-  if (u.includes('fraud'))   return ROLES.FRAUD_ANALYST;
-  if (u.includes('actuary')) return ROLES.ACTUARY;
-  if (u.includes('ops') || u.includes('exec')) return ROLES.OPERATIONS_EXEC;
-  if (u.includes('manager') || u.includes('mgr')) return ROLES.CLAIMS_MANAGER;
-  return ROLES.CLAIMS_ANALYST;
-}
-
-function relativeActive(iso: string | undefined): string {
-  if (!iso) return '—';
-  const then = new Date(iso).getTime();
-  if (isNaN(then)) return '—';
-  const diffMin = Math.max(0, Math.floor((Date.now() - then) / 60000));
-  if (diffMin < 2)          return 'now';
-  if (diffMin < 60)         return `${diffMin}m`;
-  if (diffMin < 60 * 24)    return `${Math.floor(diffMin / 60)}h`;
-  return `${Math.floor(diffMin / (60 * 24))}d`;
-}
-
-// ── Reducer ──────────────────────────────────────────────────────────────────
-
 interface State {
-  users: UserRow[];
+  users: User[];
   loading: boolean;
   error: string | null;
   search: string;
@@ -85,9 +41,11 @@ interface State {
 
 type Action =
   | { type: 'START' }
-  | { type: 'SUCCESS'; payload: UserRow[] }
+  | { type: 'SUCCESS'; payload: User[] }
   | { type: 'ERROR'; payload: string }
-  | { type: 'SEARCH'; payload: string };
+  | { type: 'SEARCH'; payload: string }
+  | { type: 'PATCH'; payload: User }
+  | { type: 'REMOVE'; payload: number };
 
 function reducer(s: State, a: Action): State {
   switch (a.type) {
@@ -95,11 +53,15 @@ function reducer(s: State, a: Action): State {
     case 'SUCCESS': return { ...s, loading: false, users: a.payload };
     case 'ERROR':   return { ...s, loading: false, error: a.payload };
     case 'SEARCH':  return { ...s, search: a.payload };
+    case 'PATCH':   return { ...s, users: s.users.map(u => u.id === a.payload.id ? a.payload : u) };
+    case 'REMOVE':  return { ...s, users: s.users.filter(u => u.id !== a.payload) };
     default:        return s;
   }
 }
 
 export default function UsersRolesPage() {
+  const { username: currentUsername } = useAuth();
+  const { message } = AntApp.useApp();
   const [state, dispatch] = useReducer(reducer, {
     users: [], loading: false, error: null, search: '',
   });
@@ -107,49 +69,73 @@ export default function UsersRolesPage() {
   const load = useCallback(async () => {
     dispatch({ type: 'START' });
     try {
-      const page = await auditApi.getLogs(0, 200);
-      const logs: AuditLog[] = page.content ?? [];
-      const byUser = new Map<string, AuditLog>();
-      for (const log of logs) {
-        if (!log.username) continue;
-        const prev = byUser.get(log.username);
-        if (!prev || prev.timestamp < log.timestamp) byUser.set(log.username, log);
-      }
-      const users: UserRow[] = Array.from(byUser.values()).map(log => ({
-        username:   log.username,
-        email:      guessEmail(log.username),
-        role:       guessRole(log.username),
-        status:     'Active',
-        lastActive: relativeActive(log.timestamp),
-      }));
-      dispatch({ type: 'SUCCESS', payload: users });
-    } catch {
-      dispatch({ type: 'ERROR', payload: 'User directory unavailable. Wire up a /users endpoint to enable management.' });
+      const data = await usersApi.getAll();
+      dispatch({ type: 'SUCCESS', payload: data });
+    } catch (err) {
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to load users.';
+      dispatch({ type: 'ERROR', payload: msg });
     }
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleRoleChange = async (user: User, role: AppRole) => {
+    try {
+      const updated = await usersApi.update(user.id, { role });
+      dispatch({ type: 'PATCH', payload: updated });
+      message.success(`Role updated to ${ROLE_LABELS[role]}`);
+    } catch (err) {
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to update role.';
+      message.error(msg);
+    }
+  };
+
+  const handleToggleEnabled = async (user: User, enabled: boolean) => {
+    try {
+      const updated = await usersApi.update(user.id, { enabled });
+      dispatch({ type: 'PATCH', payload: updated });
+      message.success(enabled ? 'User enabled' : 'User disabled — sessions revoked');
+    } catch (err) {
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to update status.';
+      message.error(msg);
+    }
+  };
+
+  const handleDelete = async (user: User) => {
+    try {
+      await usersApi.delete(user.id);
+      dispatch({ type: 'REMOVE', payload: user.id });
+      message.success(`User '${user.username}' deleted`);
+    } catch (err) {
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to delete user.';
+      message.error(msg);
+    }
+  };
 
   const filtered = useMemo(() => {
     const q = state.search.trim().toLowerCase();
     if (!q) return state.users;
     return state.users.filter(u =>
       u.username.toLowerCase().includes(q) ||
-      u.email.toLowerCase().includes(q) ||
+      (u.email ?? '').toLowerCase().includes(q) ||
+      (u.name ?? '').toLowerCase().includes(q) ||
       ROLE_LABELS[u.role].toLowerCase().includes(q),
     );
   }, [state.users, state.search]);
 
-  const columns: ColumnsType<UserRow> = [
+  const columns: ColumnsType<User> = [
     {
       title: 'User',
       dataIndex: 'username',
       key: 'user',
-      width: '28%',
-      render: (username: string) => (
+      width: '24%',
+      render: (username: string, rec) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <TintedAvatar name={username} colorKey={username} size={26} />
-          <span style={{ fontWeight: 500 }}>{username}</span>
+          <div>
+            <div style={{ fontWeight: 500 }}>{username}</div>
+            {rec.name && <div style={{ fontSize: 10, color: 'var(--ci-text-muted)' }}>{rec.name}</div>}
+          </div>
         </div>
       ),
     },
@@ -157,7 +143,7 @@ export default function UsersRolesPage() {
       title: 'Email',
       dataIndex: 'email',
       key: 'email',
-      width: '24%',
+      width: '22%',
       render: v => <Text style={{ color: 'var(--ci-text-secondary)', fontSize: 11 }}>{v}</Text>,
     },
     {
@@ -165,36 +151,85 @@ export default function UsersRolesPage() {
       dataIndex: 'role',
       key: 'role',
       width: '20%',
-      render: (role: AppRole) => <Badge tone={ROLE_TONE[role]}>{ROLE_LABELS[role]}</Badge>,
+      render: (role: AppRole, rec) => {
+        const isSelf = rec.username === currentUsername;
+        const items: MenuProps['items'] = Object.entries(ROLE_LABELS).map(([key, label]) => ({
+          key,
+          label,
+          disabled: key === role,
+        }));
+        const menuProps: MenuProps = {
+          items,
+          onClick: ({ key }) => handleRoleChange(rec, key as AppRole),
+        };
+        return isSelf ? (
+          <Badge tone={ROLE_TONE[role]}>{ROLE_LABELS[role]}</Badge>
+        ) : (
+          <Dropdown menu={menuProps} trigger={['click']}>
+            <span style={{ cursor: 'pointer' }}>
+              <Badge tone={ROLE_TONE[role]}>{ROLE_LABELS[role]} ▾</Badge>
+            </span>
+          </Dropdown>
+        );
+      },
     },
     {
       title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
+      dataIndex: 'enabled',
+      key: 'enabled',
       width: '14%',
-      render: (v: UserRow['status']) => <Badge tone={STATUS_TONE[v]}>{v}</Badge>,
+      render: (enabled: boolean, rec) => {
+        const isSelf = rec.username === currentUsername;
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Switch
+              size="small"
+              checked={enabled}
+              disabled={isSelf}
+              onChange={(checked) => handleToggleEnabled(rec, checked)}
+            />
+            <span style={{ fontSize: 11, color: enabled ? 'var(--ci-text-secondary)' : 'var(--ci-text-muted)' }}>
+              {enabled ? 'Active' : 'Disabled'}
+            </span>
+          </div>
+        );
+      },
     },
     {
-      title: 'Last active',
-      dataIndex: 'lastActive',
-      key: 'lastActive',
-      width: '10%',
-      render: v => <span style={{ color: 'var(--ci-text-muted)' }}>{v}</span>,
+      title: 'Created',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: '14%',
+      render: v => <span style={{ color: 'var(--ci-text-muted)', fontSize: 11 }}>{v?.replace('T', ' ').slice(0, 16) ?? '—'}</span>,
     },
     {
       title: '',
       key: 'action',
-      width: '4%',
+      width: '6%',
       align: 'right',
-      render: () => (
-        <Tooltip title="Actions (coming soon)">
-          <Button
-            type="text" size="small" disabled
-            icon={<MoreHorizontal size={14} strokeWidth={1.6} />}
-            style={{ color: 'var(--ci-text-muted)' }}
-          />
-        </Tooltip>
-      ),
+      render: (_, rec) => {
+        const isSelf = rec.username === currentUsername;
+        if (isSelf) {
+          return (
+            <Tooltip title="You cannot delete your own account">
+              <Button type="text" size="small" disabled icon={<MoreHorizontal size={14} strokeWidth={1.6} />} />
+            </Tooltip>
+          );
+        }
+        return (
+          <Popconfirm
+            title={`Delete user '${rec.username}'?`}
+            description="This action cannot be undone. All refresh tokens will be revoked."
+            onConfirm={() => handleDelete(rec)}
+            okText="Delete"
+            okButtonProps={{ danger: true }}
+          >
+            <Tooltip title="Delete">
+              <Button type="text" size="small" icon={<Trash2 size={13} strokeWidth={1.6} />} style={{ color: 'var(--ci-text-muted)' }} />
+            </Tooltip>
+          </Popconfirm>
+        );
+      },
     },
   ];
 
@@ -202,7 +237,7 @@ export default function UsersRolesPage() {
     <div>
       <PageHeader
         title="Users & roles"
-        subtitle={`${state.users.length} active user${state.users.length === 1 ? '' : 's'} · RBAC`}
+        subtitle={`${state.users.length} user${state.users.length === 1 ? '' : 's'} · RBAC`}
         actions={
           <>
             <div style={styles.search}>
@@ -214,18 +249,17 @@ export default function UsersRolesPage() {
                 onChange={e => dispatch({ type: 'SEARCH', payload: e.target.value })}
               />
             </div>
-            <DarkButton icon={<Plus size={12} strokeWidth={2} />} disabled>
-              Invite user
-            </DarkButton>
+            <GhostButton onClick={load} icon={<RefreshCw size={12} strokeWidth={1.8} />}>
+              Refresh
+            </GhostButton>
           </>
         }
       />
 
       {state.error && (
         <Alert
-          type="info" showIcon
-          message="Directory is read-only"
-          description={state.error}
+          type="error" showIcon
+          message={state.error}
           style={{ marginBottom: 12, borderRadius: 8 }}
           closable
         />
@@ -234,16 +268,16 @@ export default function UsersRolesPage() {
       <DataCard padding={0}>
         {!state.loading && filtered.length === 0 ? (
           <EmptyState
-            title={state.search ? 'No matches' : 'No users yet'}
+            title={state.search ? 'No matches' : 'No users'}
             description={
               state.search
                 ? `No users matching “${state.search}”.`
-                : 'Users will appear here as they sign in and generate audit events.'
+                : 'Users will appear here as they register through the auth endpoint.'
             }
           />
         ) : (
           <Table
-            rowKey="username"
+            rowKey="id"
             columns={columns}
             dataSource={filtered}
             loading={state.loading}
@@ -254,8 +288,8 @@ export default function UsersRolesPage() {
       </DataCard>
 
       <div style={styles.footnote}>
-        Users are derived from recent audit events. A dedicated <code style={styles.code}>/users</code> API will
-        enable invite and role-edit actions.
+        Click a role badge to change it. Toggling status revokes all active refresh tokens.
+        You cannot edit or delete your own account.
       </div>
     </div>
   );
@@ -277,12 +311,5 @@ const styles: Record<string, React.CSSProperties> = {
   footnote: {
     marginTop: 12, fontSize: 11,
     color: 'var(--ci-text-muted)', lineHeight: 1.5,
-  },
-  code: {
-    fontFamily: 'ui-monospace, SFMono-Regular, monospace',
-    background: 'var(--ci-bg-surface-2)',
-    padding: '1px 5px',
-    borderRadius: 3, border: '1px solid var(--ci-border)',
-    fontSize: 10,
   },
 };

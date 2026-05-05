@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useReducer, useCallback } from 'react';
-import { Alert } from 'antd';
-import { Plus } from 'lucide-react';
+import { useEffect, useMemo, useReducer, useCallback, useState } from 'react';
+import { Alert, Modal, Form, Input, App as AntApp } from 'antd';
+import { RefreshCw, Calculator } from 'lucide-react';
 
 import {
-  PageHeader, DataCard, Badge, Chip, DarkButton, EmptyState,
+  PageHeader, DataCard, Badge, Chip, DarkButton, GhostButton, EmptyState,
 } from '../../components/ui';
 import { claimsApi, METRIC_NAMES, type ClaimKpi, type MetricName } from '../../api/claimsApi';
 
@@ -85,6 +85,26 @@ export default function KpiDefinitionsPage() {
   const [state, dispatch] = useReducer(reducer, {
     samples: {}, loading: false, error: null,
   });
+  const [recalcOpen, setRecalcOpen]   = useState(false);
+  const [recalcBusy, setRecalcBusy]   = useState(false);
+  const [form] = Form.useForm();
+  const { message } = AntApp.useApp();
+
+  const handleRecalculate = async (values: { claimId: string }) => {
+    setRecalcBusy(true);
+    try {
+      await claimsApi.calculate(values.claimId.trim());
+      message.success(`KPIs recalculated for claim ${values.claimId.trim()}`);
+      setRecalcOpen(false);
+      form.resetFields();
+      load();   // refresh sample counts
+    } catch (err) {
+      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to recalculate KPIs.';
+      message.error(msg);
+    } finally {
+      setRecalcBusy(false);
+    }
+  };
 
   const load = useCallback(async () => {
     dispatch({ type: 'START' });
@@ -111,13 +131,17 @@ export default function KpiDefinitionsPage() {
         title="KPI definitions"
         subtitle={`${KPI_CATALOGUE.length} metrics defined · ${activeCount} with live data`}
         actions={
-          <DarkButton
-            icon={<Plus size={12} strokeWidth={2} />}
-            disabled
-            onClick={() => { /* placeholder — KPI definition creation is a future admin action */ }}
-          >
-            New KPI
-          </DarkButton>
+          <>
+            <GhostButton onClick={load} icon={<RefreshCw size={12} strokeWidth={1.8} />}>
+              Refresh
+            </GhostButton>
+            <DarkButton
+              icon={<Calculator size={12} strokeWidth={2} />}
+              onClick={() => setRecalcOpen(true)}
+            >
+              Recalculate
+            </DarkButton>
+          </>
         }
       />
 
@@ -171,7 +195,29 @@ export default function KpiDefinitionsPage() {
       <div style={styles.footnote}>
         Metric names map to the backend <code style={styles.code}>MetricName</code> enum. Formulas shown here are specs —
         actual computations live in <code style={styles.code}>claims-metrics-service</code>.
+        Use <strong>Recalculate</strong> to re-run all 6 KPIs for a specific claim ID.
       </div>
+
+      <Modal
+        title="Recalculate KPIs for a claim"
+        open={recalcOpen}
+        onCancel={() => { setRecalcOpen(false); form.resetFields(); }}
+        onOk={() => form.submit()}
+        okText="Recalculate"
+        confirmLoading={recalcBusy}
+        destroyOnClose
+      >
+        <Form form={form} layout="vertical" onFinish={handleRecalculate}>
+          <Form.Item
+            name="claimId"
+            label="Claim ID"
+            rules={[{ required: true, min: 3, message: 'Enter a valid claim ID' }]}
+            extra="Triggers POST /api/kpis/calculate/{claimId} — overwrites the existing 6 KPI rows for this claim."
+          >
+            <Input placeholder="CLM-2026-AUTO-001" autoFocus />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }

@@ -14,6 +14,8 @@ import {
   ingestApi,
   type RawClaim,
 } from '../../api/dataIngestionApi';
+import { useAuth } from '../../hooks/useAuth';
+import { canEdit } from '../../utils/roles';
 
 const { Text } = Typography;
 
@@ -62,6 +64,9 @@ function reducer(s: State, a: Action): State {
 export default function RawClaimsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { role } = useAuth();
+  // Fraud Analysts can read raw payloads for investigation but cannot delete
+  const canWrite = canEdit(role, '/ingestion/raw');
 
   const [state, dispatch] = useReducer(reducer, {
     items: [], loading: false, error: null,
@@ -176,13 +181,13 @@ export default function RawClaimsPage() {
       key: 'action',
       width: 60,
       align: 'right',
-      render: (_, rec) => (
+      render: (_, rec) => canWrite ? (
         <Popconfirm title="Delete this raw claim?" onConfirm={() => handleDelete(rec.rawId)}>
           <Tooltip title="Delete">
             <Button type="text" size="small" icon={<Trash2 size={13} strokeWidth={1.6} />} style={{ color: 'var(--ci-text-muted)' }} />
           </Tooltip>
         </Popconfirm>
-      ),
+      ) : null,
     },
   ];
 

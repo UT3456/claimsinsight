@@ -17,6 +17,8 @@ import {
   type DataFeed,
 } from '../../api/dataIngestionApi';
 import { ingestApi } from '../../api/dataIngestionApi';
+import { useAuth } from '../../hooks/useAuth';
+import { canEdit } from '../../utils/roles';
 
 const { Option } = Select;
 
@@ -112,6 +114,9 @@ function feedLabel(feed: DataFeed): string {
 
 export default function FeedsPage() {
   const navigate = useNavigate();
+  const { role } = useAuth();
+  // Managers + Operations Execs see this page but cannot add / delete / ingest.
+  const canWrite = canEdit(role, '/ingestion/feeds');
   const [state, dispatch] = useReducer(reducer, {
     items: [], loading: false, error: null,
     statusFilter: 'ALL',
@@ -276,6 +281,9 @@ export default function FeedsPage() {
       width: '18%',
       align: 'right',
       render: (_, rec) => {
+        // Read-only viewers (Managers etc.) see no row actions
+        if (!canWrite) return null;
+
         const deleteBtn = (
           <Popconfirm title="Delete this feed?" onConfirm={() => handleDelete(rec.feedId)}>
             <Tooltip title="Delete">
@@ -338,12 +346,14 @@ export default function FeedsPage() {
             <GhostButton onClick={load} icon={<RefreshCw size={12} strokeWidth={1.8} />}>
               Refresh
             </GhostButton>
-            <DarkButton
-              onClick={() => dispatch({ type: 'OPEN_MODAL' })}
-              icon={<Plus size={12} strokeWidth={2} />}
-            >
-              Add feed
-            </DarkButton>
+            {canWrite && (
+              <DarkButton
+                onClick={() => dispatch({ type: 'OPEN_MODAL' })}
+                icon={<Plus size={12} strokeWidth={2} />}
+              >
+                Add feed
+              </DarkButton>
+            )}
           </>
         }
       />

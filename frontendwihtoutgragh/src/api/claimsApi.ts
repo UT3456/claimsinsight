@@ -48,6 +48,10 @@ export const claimsApi = {
   delete: (id: number): Promise<void> =>
     axiosInstance.delete(`/kpis/${id}`).then(r => r.data),
 
+  /** Triggers backend recalculation of all 6 KPIs for a claim. Admin-only via UI. */
+  calculate: (claimId: string): Promise<ClaimKpi[]> =>
+    axiosInstance.post(`/kpis/calculate/${claimId}`).then(r => r.data),
+
   // ── Claim ACTIVE/INACTIVE status (persisted in claims-metrics-service) ──
   getAllClaimStatuses: (): Promise<Record<string, ClaimStatus>> =>
     axiosInstance.get('/claim-status').then(r => r.data),

@@ -31,14 +31,20 @@ export const ROLE_COLORS: Record<AppRole, string> = {
 };
 
 /**
- * Which roles can access each route.
- * ADMIN implicitly has access to everything — checked separately.
+ * Which roles can navigate to each route (read access).
+ * ADMIN implicitly has access to everything — checked in canAccess().
  */
 export const ROUTE_ROLES: Record<string, AppRole[]> = {
   '/dashboard':        [ROLES.CLAIMS_ANALYST, ROLES.CLAIMS_MANAGER, ROLES.FRAUD_ANALYST, ROLES.ACTUARY, ROLES.OPERATIONS_EXEC, ROLES.ADMIN],
   '/claims':           [ROLES.CLAIMS_ANALYST, ROLES.CLAIMS_MANAGER, ROLES.ACTUARY, ROLES.OPERATIONS_EXEC, ROLES.ADMIN],
-  '/ingestion/feeds':  [ROLES.CLAIMS_ANALYST, ROLES.ADMIN],
-  '/ingestion/raw':    [ROLES.CLAIMS_ANALYST, ROLES.ADMIN],
+
+  // Admin tabs — read access widened per the role matrix
+  '/ingestion/feeds':       [ROLES.CLAIMS_ANALYST, ROLES.CLAIMS_MANAGER, ROLES.ADMIN],
+  '/ingestion/raw':         [ROLES.CLAIMS_ANALYST, ROLES.FRAUD_ANALYST, ROLES.ADMIN],
+  '/admin/kpi-definitions': [ROLES.CLAIMS_MANAGER, ROLES.ACTUARY, ROLES.OPERATIONS_EXEC, ROLES.ADMIN],
+  '/admin/audit-logs':      [ROLES.FRAUD_ANALYST, ROLES.ADMIN],
+  '/admin/users':           [ROLES.ADMIN],
+
   '/adjusters':        [ROLES.CLAIMS_MANAGER, ROLES.OPERATIONS_EXEC, ROLES.ADMIN],
   '/sla-violations':   [ROLES.CLAIMS_MANAGER, ROLES.OPERATIONS_EXEC, ROLES.ADMIN],
   '/costs':            [ROLES.ACTUARY, ROLES.CLAIMS_MANAGER, ROLES.ADMIN],
@@ -48,15 +54,53 @@ export const ROUTE_ROLES: Record<string, AppRole[]> = {
   '/denial-leakage':   [ROLES.CLAIMS_ANALYST, ROLES.FRAUD_ANALYST, ROLES.ADMIN],
   '/reports':          [ROLES.CLAIMS_ANALYST, ROLES.CLAIMS_MANAGER, ROLES.FRAUD_ANALYST, ROLES.ACTUARY, ROLES.OPERATIONS_EXEC, ROLES.ADMIN],
   '/notifications':    [ROLES.CLAIMS_ANALYST, ROLES.CLAIMS_MANAGER, ROLES.FRAUD_ANALYST, ROLES.ACTUARY, ROLES.OPERATIONS_EXEC, ROLES.ADMIN],
-  '/admin/audit-logs':      [ROLES.ADMIN],
+};
+
+/**
+ * Which roles can WRITE (create / update / delete) on each route.
+ * Anything not listed here defaults to "any role with read access can also write".
+ * ADMIN is allowed everywhere implicitly.
+ *
+ * Components should check canEdit() to disable Add / Save / Delete buttons
+ * when the user only has read access.
+ */
+export const WRITE_ROLES: Record<string, AppRole[]> = {
+  '/ingestion/feeds':       [ROLES.CLAIMS_ANALYST, ROLES.ADMIN],
+  '/ingestion/raw':         [ROLES.CLAIMS_ANALYST, ROLES.ADMIN],
   '/admin/kpi-definitions': [ROLES.ADMIN],
+  '/admin/audit-logs':      [ROLES.ADMIN],
   '/admin/users':           [ROLES.ADMIN],
 };
 
-/** Returns true if the given role can access the given route. */
+/** Returns true if the given role can view the given route. */
 export function canAccess(role: string | null, route: string): boolean {
   if (!role) return false;
   if (role === ROLES.ADMIN) return true;
   const allowed = ROUTE_ROLES[route] ?? [];
   return allowed.includes(role as AppRole);
+}
+
+/** Returns true if the given role can perform write actions on the route. */
+export function canEdit(role: string | null, route: string): boolean {
+  if (!role) return false;
+  if (role === ROLES.ADMIN) return true;
+  const writers = WRITE_ROLES[route];
+  // No write restriction defined → anyone with read access can also write
+  if (!writers) return canAccess(role, route);
+  return writers.includes(role as AppRole);
+}
+
+/**
+ * Returns true if the user has access to ANY admin-section route — used by
+ * Sidebar to decide whether to render the "Admin" header at all.
+ */
+export function hasAdminSectionAccess(role: string | null): boolean {
+  if (!role) return false;
+  return [
+    '/ingestion/feeds',
+    '/ingestion/raw',
+    '/admin/kpi-definitions',
+    '/admin/users',
+    '/admin/audit-logs',
+  ].some(route => canAccess(role, route));
 }

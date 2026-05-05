@@ -71,7 +71,10 @@ public class SecurityConfig {
                                 "ROLE_ACTUARY", "ROLE_OPERATIONS_EXEC", "ROLE_ADMIN")
 
                         // ── Data Ingestion / Feeds ──────────────────────────────────────
-                        // Analysts (need raw data) + Admin
+                        // Read access (GET): Analysts, Managers + Admin
+                        // Write access (POST/PUT/PATCH/DELETE): Analysts + Admin only
+                        .pathMatchers(HttpMethod.GET, "/api/feeds/**", "/api/ingest/**").hasAnyAuthority(
+                                "ROLE_CLAIMS_ANALYST", "ROLE_CLAIMS_MANAGER", "ROLE_ADMIN")
                         .pathMatchers("/api/feeds/**", "/api/ingest/**").hasAnyAuthority(
                                 "ROLE_CLAIMS_ANALYST", "ROLE_ADMIN")
 
@@ -104,8 +107,17 @@ public class SecurityConfig {
                         .pathMatchers("/api/notifications/**").authenticated()
 
                         // ── Audit Logs ──────────────────────────────────────────────────
-                        // Admin only
+                        // Admin (full) + Fraud Analyst (read) for internal investigations
+                        .pathMatchers(HttpMethod.GET, "/api/audit/**").hasAnyAuthority(
+                                "ROLE_ADMIN", "ROLE_FRAUD_ANALYST")
                         .pathMatchers("/api/audit/**").hasAuthority("ROLE_ADMIN")
+
+                        // ── KPI definitions (read-only catalog hits /api/kpis) ──────────
+                        // Already covered by /api/kpis/** rule above — no extra path needed.
+
+                        // ── User management ─────────────────────────────────────────────
+                        // Admin only — list / update role / disable / delete
+                        .pathMatchers("/api/users/**").hasAuthority("ROLE_ADMIN")
 
                         // ── Catch-all ───────────────────────────────────────────────────
                         .anyExchange().authenticated()

@@ -120,6 +120,10 @@ spring:
           predicates:
             - Path=/api/reports/**
 
+        # NOTE: /api/users/** and /api/audit/** are handled INTERNALLY by the
+        # gateway's embedded identity module — no route needed (Spring MVC
+        # @RestController takes priority over the gateway's predicate match).
+
       globalcors:
         cors-configurations:
           '[/**]':

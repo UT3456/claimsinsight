@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth }                   from '../../hooks/useAuth';
+import { hasAdminSectionAccess }     from '../../utils/roles';
 import { Shield } from 'lucide-react';
 
 /**
@@ -27,7 +28,10 @@ interface NavSection {
 export default function Sidebar({ collapsed }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { hasAccess, isAdmin } = useAuth();
+  const { hasAccess, role } = useAuth();
+  // Show "Admin" section if the user has access to any admin route — not just
+  // ROLE_ADMIN. Managers/Actuaries/Fraud analysts now see read-only tabs.
+  const showAdminSection = hasAdminSectionAccess(role);
 
   const sections: NavSection[] = [
     {
@@ -61,14 +65,14 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         { to: '/notifications', label: 'Notifications', allowed: hasAccess('/notifications'), tone: 'neutral' },
       ],
     },
-    ...(isAdmin ? [{
+    ...(showAdminSection ? [{
       title: 'Admin',
       items: [
-        { to: '/ingestion/feeds',      label: 'Data feeds',      allowed: hasAccess('/ingestion/feeds'),     tone: 'neutral' as const },
-        { to: '/ingestion/raw',        label: 'Raw claims',      allowed: hasAccess('/ingestion/raw'),       tone: 'neutral' as const },
-        { to: '/admin/kpi-definitions', label: 'KPI config',     allowed: true,                              tone: 'neutral' as const },
-        { to: '/admin/users',          label: 'Users',           allowed: true,                              tone: 'neutral' as const },
-        { to: '/admin/audit-logs',     label: 'Audit log',       allowed: true,                              tone: 'neutral' as const },
+        { to: '/ingestion/feeds',       label: 'Data feeds',  allowed: hasAccess('/ingestion/feeds'),       tone: 'neutral' as const },
+        { to: '/ingestion/raw',         label: 'Raw claims',  allowed: hasAccess('/ingestion/raw'),         tone: 'neutral' as const },
+        { to: '/admin/kpi-definitions', label: 'KPI config',  allowed: hasAccess('/admin/kpi-definitions'), tone: 'neutral' as const },
+        { to: '/admin/users',           label: 'Users',       allowed: hasAccess('/admin/users'),           tone: 'neutral' as const },
+        { to: '/admin/audit-logs',      label: 'Audit log',   allowed: hasAccess('/admin/audit-logs'),      tone: 'neutral' as const },
       ],
     }] : []),
   ];
