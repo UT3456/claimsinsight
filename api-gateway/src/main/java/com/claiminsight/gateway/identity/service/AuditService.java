@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -19,12 +20,36 @@ public class AuditService {
 
     private final AuditLogRepository auditLogRepository;
 
+    // ── Dedup window ────────────────────────────────────────────────────────
+    // Identical (username, action, resource) tuples within this window are
+    // collapsed into a single audit row. Catches:
+    //   - React StrictMode double-fired useEffect (~100 ms apart)
+    //   - Warmup ping + Dashboard's actual API call to same endpoint (~200 ms)
+    //   - User triple-clicking the same nav button
+    private static final long DEDUP_WINDOW_MS = 3_000L;
+    private final ConcurrentHashMap<String, Long> recent = new ConcurrentHashMap<>();
+
     // -------------------------------------------------------------------------
     // Write (async — fire-and-forget, never blocks the request thread)
     // -------------------------------------------------------------------------
 
     @Async
     public void log(String username, Long userId, String action, String resource, String metadata) {
+        // Dedup: skip if the exact same triple was logged within DEDUP_WINDOW_MS.
+        // We DON'T dedup the AUDIT_CLEARED / AUDIT_PURGED markers — those are
+        // written from inside @Transactional methods and must always persist.
+        if (!"AUDIT_CLEARED".equals(action) && !"AUDIT_PURGED".equals(action)) {
+            String key   = username + "|" + action + "|" + resource;
+            long   now   = System.currentTimeMillis();
+            Long   prev  = recent.put(key, now);
+            if (prev != null && (now - prev) < DEDUP_WINDOW_MS) {
+                return; // collapse duplicate
+            }
+            // Bound the map — drop entries that have already aged out.
+            if (recent.size() > 2_000) {
+                recent.entrySet().removeIf(e -> (now - e.getValue()) > DEDUP_WINDOW_MS);
+            }
+        }
         try {
             AuditLog entry = AuditLog.builder()
                     .username(username)
