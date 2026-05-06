@@ -149,14 +149,18 @@ public class InvestigationService {
             return;
         }
         try {
+            // Drop the role prefix on the actor — when an admin or fraud-team member
+            // does the escalation, hard-coding "Analyst {name}" reads wrong. Just use
+            // the username, which is unambiguous.
+            String openedBy = inv.getOpenedBy() != null ? inv.getOpenedBy() : "an analyst";
+            String body = "Claim " + inv.getClaimId() + " flagged for SIU review by " + openedBy + ".";
+            if (inv.getNotes() != null && !inv.getNotes().isBlank()) {
+                body += " Notes: " + inv.getNotes();
+            }
             NotificationDispatchRequestDTO dispatch = NotificationDispatchRequestDTO.builder()
                     .targetRoles(Set.of("FRAUD", "ADMIN"))
-                    .title("New SIU escalation — claim " + inv.getClaimId())
-                    .message("Analyst " + inv.getOpenedBy() + " escalated claim "
-                             + inv.getClaimId() + " for SIU review."
-                             + (inv.getNotes() != null && !inv.getNotes().isBlank()
-                                 ? " Notes: " + inv.getNotes()
-                                 : ""))
+                    .title("SIU escalation — " + inv.getClaimId())
+                    .message(body)
                     .category("RISK")
                     .referenceId(inv.getClaimId())
                     .build();
