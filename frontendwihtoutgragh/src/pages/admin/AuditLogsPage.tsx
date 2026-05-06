@@ -232,7 +232,32 @@ export default function AuditLogsPage() {
       render: v => <span style={{ color: 'var(--ci-text-muted)' }}>#{v}</span>,
     },
     {
+      // Visually merge consecutive rows for the same user so we don't render
+      // "utkarsh / utkarsh / utkarsh / utkarsh / utkarsh" five times in a row.
+      // The first row of each group gets rowSpan=N (where N is the run length);
+      // subsequent rows get rowSpan=0, which Ant Design hides automatically.
+      // The merged cell aligns to the top so it's clear it covers the whole run.
       title: 'User', dataIndex: 'username', key: 'username', width: 160,
+      onCell: (_rec, index) => {
+        if (index === undefined) return {};
+        const items = state.items;
+        const current = items[index]?.username;
+        const prev    = items[index - 1]?.username;
+        // Subsequent row in a same-user run → hidden by rowSpan: 0
+        if (prev !== undefined && prev === current) {
+          return { rowSpan: 0 };
+        }
+        // Count how many consecutive following rows belong to the same user
+        let span = 1;
+        for (let i = index + 1; i < items.length; i++) {
+          if (items[i].username === current) span++;
+          else break;
+        }
+        return {
+          rowSpan: span,
+          style: { verticalAlign: 'top' as const },
+        };
+      },
       render: v => <span style={{ fontWeight: 500 }}>{v}</span>,
     },
     {
@@ -252,8 +277,10 @@ export default function AuditLogsPage() {
       render: v => <span style={{ color: 'var(--ci-text-secondary)' }}>{v}</span>,
     },
     {
+      // No client-side sorter — data is already returned newest-first by the
+      // backend, and a re-sort would scramble the consecutive same-user runs
+      // that the User column visually merges.
       title: 'Timestamp', dataIndex: 'timestamp', key: 'timestamp', width: 160,
-      sorter: (a, b) => a.timestamp.localeCompare(b.timestamp),
       render: v => <span style={{ color: 'var(--ci-text-secondary)' }}>{v?.replace('T', ' ').slice(0, 19)}</span>,
     },
     ...(canClear ? [{
