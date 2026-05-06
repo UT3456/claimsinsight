@@ -699,6 +699,38 @@ INSERT INTO notifications (user_id, title, message, category, reference_id, stat
 (5, 'Trend alert',                     'Auto severity trending up 8% MoM in Q2-2026.',                             'COST',  NULL,                'UNREAD',    '2026-05-03 06:00:00', NULL),
 (6, 'Top adjuster alert',              'Adjuster #5 leading on quality (94.2). Adjuster #6 at 73 — needs coaching.','PERFORMANCE', NULL,          'UNREAD',    '2026-05-01 06:00:00', NULL);
 
+-- ── Admin shadow copies — admin sees a copy of every meaningful event ──────
+-- Per the notification policy, ADMIN is part of every targetRoles set so the
+-- admin's bell reflects every signal in the system. The seed already gives
+-- admin copies of risk + escalation + system events; this block fills in
+-- the gaps for DENIAL / PERFORMANCE / AGING / COST that previously only
+-- went to the role-specific user.
+INSERT INTO notifications (user_id, title, message, category, reference_id, status, created_date, read_date) VALUES
+-- DENIAL category copies (Sarah was the only recipient before)
+(1, 'Denial spike detected',           'CO-4 (policy lapsed) doubled this week — 4 occurrences.',                 'DENIAL', NULL,                'UNREAD',    '2026-05-01 08:00:00', NULL),
+(1, 'New denial pattern',              'CLM-2026-HLTH-005 denied: CO-4 policy lapsed.',                            'DENIAL', 'CLM-2026-HLTH-005', 'READ',      '2026-01-19 06:10:00', '2026-01-19 14:00:00'),
+(1, 'New denial pattern',              'CLM-2026-LIAB-003 denied: CO-16 missing information.',                     'DENIAL', 'CLM-2026-LIAB-003', 'READ',      '2026-01-18 06:10:00', '2026-01-18 14:00:00'),
+(1, 'Leakage flag raised',             'Overpayment detected on CLM-2026-PROP-007: $18,500 estimated loss.',       'DENIAL', 'CLM-2026-PROP-007', 'UNREAD',    '2026-04-05 06:12:00', NULL),
+(1, 'Leakage flag raised',             'Overpayment on CLM-2026-LIAB-002: $8,200.',                                'DENIAL', 'CLM-2026-LIAB-002', 'READ',      '2025-11-05 06:12:00', '2025-11-05 16:00:00'),
+(1, 'Denial spike — CO-4',             '3 CO-4 denials in last 7 days.',                                           'DENIAL', NULL,                'UNREAD',    '2026-05-04 06:10:00', NULL),
+-- PERFORMANCE copies (David was the only recipient before)
+(1, 'Adjuster performance alert',      'Adjuster #6 (Tom) error rate hit 6.5% in Q1-2026 — flagged for training.', 'PERFORMANCE', NULL,           'READ',      '2026-04-01 08:00:00', '2026-04-01 12:00:00'),
+(1, 'SLA breach',                      'CLM-2026-PROP-007 breached TAT SLA by 16 days.',                           'PERFORMANCE', 'CLM-2026-PROP-007', 'READ',  '2026-05-06 06:15:00', '2026-05-06 13:00:00'),
+(1, 'SLA breach',                      'CLM-2026-WC-004 breached TAT SLA by 16 days.',                             'PERFORMANCE', 'CLM-2026-WC-004',   'READ',  '2026-02-15 06:15:00', '2026-02-15 14:00:00'),
+(1, 'SLA breach',                      'CLM-2026-LIAB-006 breached SLA by 13 days.',                               'PERFORMANCE', 'CLM-2026-LIAB-006', 'UNREAD','2026-05-12 06:15:00', NULL),
+(1, 'Adjuster overload',               'Adjuster #2 handling 35 claims in Q1 (avg 22).',                           'PERFORMANCE', NULL,           'UNREAD',    '2026-04-15 08:00:00', NULL),
+(1, 'Cycle time degradation',          'Avg cycle time increased to 26 days (target 20).',                         'PERFORMANCE', NULL,           'UNREAD',    '2026-05-01 06:00:00', NULL),
+-- AGING copies (Nadia / Sarah / David were recipients before)
+(1, 'Aging — claim 90+',               '13 claims now in 90+ aging bucket.',                                       'AGING', NULL,                'UNREAD',    '2026-05-04 06:00:00', NULL),
+(1, 'Aging — claim 90+',               '12 claims now in 90+ aging bucket.',                                       'AGING', NULL,                'READ',      '2026-04-15 06:00:00', '2026-04-15 16:00:00'),
+(1, 'Aging escalation',                '6 claims under your team aged > 90 days.',                                 'AGING', NULL,                'UNREAD',    '2026-05-04 06:00:00', NULL),
+-- COST copies (Nadia / Lena were recipients before)
+(1, 'Reserve adequacy warning',        'CLM-2026-PROP-007 reserve $297K vs paid $248K — adequate ratio 120%.',     'COST',  'CLM-2026-PROP-007', 'UNREAD',    '2026-05-02 06:00:00', NULL),
+(1, 'Severity trend alert',            'Bodily injury severity grew 12% YoY against 7% pricing assumption.',       'COST',  NULL,                'UNREAD',    '2026-05-03 06:00:00', NULL),
+(1, 'Loss ratio escalation',           'Commercial property segment loss ratio climbed 62% → 71% in 2 months.',    'COST',  NULL,                'UNREAD',    '2026-05-04 06:00:00', NULL),
+(1, 'Reserve change',                  'Reserve on CLM-2026-LIAB-006 increased to $258K.',                         'COST',  'CLM-2026-LIAB-006', 'READ',      '2026-04-14 14:00:00', '2026-04-14 17:00:00'),
+(1, 'Cost spike detected',             'Medical costs up 18% MoM.',                                                'COST',  NULL,                'READ',      '2026-04-30 06:00:00', '2026-04-30 12:00:00');
+
 -- ============================================================================
 -- 9. ANALYTICS REPORTS  (claims_analytics_report_db)
 -- ============================================================================

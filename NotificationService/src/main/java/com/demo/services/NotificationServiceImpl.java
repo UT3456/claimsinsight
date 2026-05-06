@@ -220,28 +220,37 @@ public class NotificationServiceImpl implements NotificationService {
             return;
         }
 
-        List<User> fraudUsers = entityManager
-                .createQuery("SELECT u FROM User u WHERE u.role = :role AND u.isActive = true", User.class)
-                .setParameter("role", UserRole.FRAUD)
-                .getResultList();
+        // Per notification policy:
+        //   score ≥ 75       → FRAUD + ADMIN
+        //   score ≥ 90 (critical) → FRAUD + ADMIN + MANAGER
+        // Pre-load both audience sets so we don't re-query per claim.
+        List<User> baseAudience = loadActiveUsers(List.of(UserRole.FRAUD, UserRole.ADMIN));
+        List<User> criticalAudience = loadActiveUsers(List.of(UserRole.FRAUD, UserRole.ADMIN, UserRole.MANAGER));
 
         for (RiskScoreDTO score : highRiskScores) {
             boolean alreadyAlerted = notificationRepository.existsByReferenceIdAndCategoryAndStatus(
                     score.getClaimId(), NotificationCategory.RISK, NotificationStatus.UNREAD);
             if (alreadyAlerted) continue;
 
-            String riskLabel = score.getScoreValue() >= 80.0 ? "HIGH"
+            boolean isCritical = score.getScoreValue() >= 90.0;
+            String riskLabel = isCritical ? "CRITICAL"
+                    : score.getScoreValue() >= 80.0 ? "HIGH"
                     : score.getScoreValue() >= 60.0 ? "MEDIUM" : "LOW";
-            String title   = "High Risk Claim Detected — " + score.getClaimId();
+            String title   = (isCritical ? "Critical risk claim — " : "High Risk Claim Detected — ") + score.getClaimId();
             String message = String.format(
-                    "Claim %s has a fraud risk score of %.1f (%s). Immediate review required.",
-                    score.getClaimId(), score.getScoreValue(), riskLabel);
+                    "Claim %s has a fraud risk score of %.1f (%s). %s",
+                    score.getClaimId(), score.getScoreValue(), riskLabel,
+                    isCritical
+                        ? "Manager review escalation triggered."
+                        : "Immediate review required.");
 
-            for (User user : fraudUsers) {
+            List<User> audience = isCritical ? criticalAudience : baseAudience;
+            for (User user : audience) {
                 saveSystemNotification(user.getUserId(), title, message,
                         NotificationCategory.RISK, score.getClaimId());
             }
-            log.warn("RISK alert fired for claim={} score={}", score.getClaimId(), score.getScoreValue());
+            log.warn("RISK alert fired for claim={} score={} criticality={}",
+                     score.getClaimId(), score.getScoreValue(), isCritical ? "CRITICAL" : "HIGH");
         }
     }
 
@@ -276,10 +285,8 @@ public class NotificationServiceImpl implements NotificationService {
                 .filter(v -> v.getViolationDate() == null || !v.getViolationDate().isBefore(startOfMonth))
                 .collect(Collectors.groupingBy(SLAViolationDTO::getAdjusterId, Collectors.counting()));
 
-        List<User> managers = entityManager
-                .createQuery("SELECT u FROM User u WHERE u.role = :role AND u.isActive = true", User.class)
-                .setParameter("role", UserRole.MANAGER)
-                .getResultList();
+        // Per notification policy: SLA breach → MANAGER + ADMIN.
+        List<User> audience = loadActiveUsers(List.of(UserRole.MANAGER, UserRole.ADMIN));
 
         for (Map.Entry<Long, Long> entry : violationCounts.entrySet()) {
             Long adjusterId     = entry.getKey();
@@ -296,8 +303,8 @@ public class NotificationServiceImpl implements NotificationService {
                     "Adjuster %d has breached SLA on %d claims this month. Threshold is %d. Please review workload.",
                     adjusterId, violationCount, SLA_VIOLATION_THRESHOLD);
 
-            for (User manager : managers) {
-                saveSystemNotification(manager.getUserId(), title, message,
+            for (User user : audience) {
+                saveSystemNotification(user.getUserId(), title, message,
                         NotificationCategory.PERFORMANCE, referenceId);
             }
             log.warn("PERFORMANCE alert fired for adjusterId={} violations={}", adjusterId, violationCount);
@@ -327,10 +334,9 @@ public class NotificationServiceImpl implements NotificationService {
             return;
         }
 
-        List<User> analysts = entityManager
-                .createQuery("SELECT u FROM User u WHERE u.role = :role AND u.isActive = true", User.class)
-                .setParameter("role", UserRole.ANALYST)
-                .getResultList();
+        // Per notification policy: aging 90+ → ANALYST + MANAGER + ADMIN.
+        List<User> audience = loadActiveUsers(
+                List.of(UserRole.ANALYST, UserRole.MANAGER, UserRole.ADMIN));
 
         for (AgingRecordDTO record : criticalAging) {
             boolean alreadyAlerted = notificationRepository.existsByReferenceIdAndCategoryAndStatus(
@@ -342,12 +348,25 @@ public class NotificationServiceImpl implements NotificationService {
                     "Claim %s has been aging for %d days (bucket: %s). Immediate action required.",
                     record.getClaimId(), record.getAgingDays(), record.getAgingBucket());
 
-            for (User analyst : analysts) {
-                saveSystemNotification(analyst.getUserId(), title, message,
+            for (User user : audience) {
+                saveSystemNotification(user.getUserId(), title, message,
                         NotificationCategory.AGING, record.getClaimId());
             }
             log.warn("AGING alert fired for claim={} days={}", record.getClaimId(), record.getAgingDays());
         }
+    }
+
+    /**
+     * Loads every active user matching any of the given UserRoles.
+     * Replaces the per-job inline JPQL so multi-role audiences can be
+     * loaded in one query without each scheduled job re-implementing it.
+     */
+    private List<User> loadActiveUsers(List<UserRole> roles) {
+        if (roles == null || roles.isEmpty()) return List.of();
+        return entityManager
+                .createQuery("SELECT u FROM User u WHERE u.role IN :roles AND u.isActive = true", User.class)
+                .setParameter("roles", roles)
+                .getResultList();
     }
 
     /** Reusable builder for system-generated notifications */
