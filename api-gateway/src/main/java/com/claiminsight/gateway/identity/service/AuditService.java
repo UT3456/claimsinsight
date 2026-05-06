@@ -106,15 +106,16 @@ public class AuditService {
         // Security-relevant — must keep separate rows
         if (action.equals("LOGIN_FAILED"))   return false;
         if (action.equals("REGISTER"))       return false;
-        if (action.equals("USER_UPDATED"))   return false;
         if (action.equals("USER_DELETED"))   return false;
         if (action.equals("TOKEN_REFRESH"))  return false; // each refresh is a token rotation
-        // Mutation prefixes — each occurrence is a distinct change
+        // Mutation prefixes — each occurrence is a distinct change to data
         if (action.startsWith("CREATE "))    return false;
-        if (action.startsWith("UPDATE "))    return false;
         if (action.startsWith("DELETE "))    return false;
-        if (action.startsWith("MARK ALL "))  return false;
-        // Everything else (VIEW *, LOGIN_SUCCESS, LOGOUT, AUTH *) → upsert
+        // NOTE: MARK ALL *, USER_UPDATED, UPDATE * are now upserted because
+        // they are idempotent in intent — clicking "Mark all read" four times
+        // in a row, or hitting save twice on the same user-edit form, should
+        // not produce four audit rows. The 30 min upsert window collapses
+        // them; a separate edit half an hour later still creates a new row.
         return true;
     }
 
