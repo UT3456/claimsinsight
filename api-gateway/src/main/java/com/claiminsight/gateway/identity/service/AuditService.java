@@ -20,13 +20,24 @@ public class AuditService {
 
     private final AuditLogRepository auditLogRepository;
 
-    // ── Dedup window ────────────────────────────────────────────────────────
-    // Identical (username, action, resource) tuples within this window are
-    // collapsed into a single audit row. Catches:
-    //   - React StrictMode double-fired useEffect (~100 ms apart)
-    //   - Warmup ping + Dashboard's actual API call to same endpoint (~200 ms)
-    //   - User triple-clicking the same nav button
-    private static final long DEDUP_WINDOW_MS = 3_000L;
+    // ── Upsert window ───────────────────────────────────────────────────────
+    // If the same (username, action, resource) triple was logged within this
+    // window, we BUMP the existing row's timestamp instead of inserting a new
+    // row. This collapses noisy repeats like:
+    //   - SSE notification stream reconnecting every few minutes
+    //   - User refreshing the same page repeatedly
+    //   - Polling endpoints firing on a schedule
+    //
+    // Mutations (CREATE / UPDATE / DELETE / REGISTER / LOGIN_FAILED / USER_*
+    // / AUDIT_CLEARED / AUDIT_PURGED) never get upserted — each occurrence is
+    // a discrete event with security/forensic value, and merging them would
+    // hide brute-force patterns or repeated administrative changes.
+    private static final long UPSERT_WINDOW_MINUTES = 30L;
+
+    // ── In-memory rapid-fire drop (sub-200ms window) ───────────────────────
+    // Catches React StrictMode double-fires and warmup-ping-vs-real-call
+    // races without hitting the DB.
+    private static final long FAST_DEDUP_WINDOW_MS = 500L;
     private final ConcurrentHashMap<String, Long> recent = new ConcurrentHashMap<>();
 
     // -------------------------------------------------------------------------
@@ -34,23 +45,43 @@ public class AuditService {
     // -------------------------------------------------------------------------
 
     @Async
+    @Transactional
     public void log(String username, Long userId, String action, String resource, String metadata) {
-        // Dedup: skip if the exact same triple was logged within DEDUP_WINDOW_MS.
-        // We DON'T dedup the AUDIT_CLEARED / AUDIT_PURGED markers — those are
-        // written from inside @Transactional methods and must always persist.
-        if (!"AUDIT_CLEARED".equals(action) && !"AUDIT_PURGED".equals(action)) {
-            String key   = username + "|" + action + "|" + resource;
-            long   now   = System.currentTimeMillis();
-            Long   prev  = recent.put(key, now);
-            if (prev != null && (now - prev) < DEDUP_WINDOW_MS) {
-                return; // collapse duplicate
+        // Markers written from inside other @Transactional methods must always persist.
+        boolean isMarker = "AUDIT_CLEARED".equals(action) || "AUDIT_PURGED".equals(action);
+
+        if (!isMarker) {
+            // 1. Fast in-memory drop for rapid-fire bursts (StrictMode, warmup race)
+            String key  = username + "|" + action + "|" + resource;
+            long   now  = System.currentTimeMillis();
+            Long   prev = recent.put(key, now);
+            if (prev != null && (now - prev) < FAST_DEDUP_WINDOW_MS) {
+                return;
             }
-            // Bound the map — drop entries that have already aged out.
             if (recent.size() > 2_000) {
-                recent.entrySet().removeIf(e -> (now - e.getValue()) > DEDUP_WINDOW_MS);
+                recent.entrySet().removeIf(e -> (now - e.getValue()) > FAST_DEDUP_WINDOW_MS);
             }
         }
+
         try {
+            // 2. Upsert path — for non-mutation events, find an existing row in
+            //    the last UPSERT_WINDOW_MINUTES and bump its timestamp + metadata
+            //    instead of inserting a new row.
+            if (!isMarker && shouldUpsert(action)) {
+                LocalDateTime cutoff = LocalDateTime.now().minusMinutes(UPSERT_WINDOW_MINUTES);
+                AuditLog existing = auditLogRepository
+                        .findFirstByUsernameAndActionAndResourceAndTimestampAfterOrderByTimestampDesc(
+                                username, action, resource, cutoff)
+                        .orElse(null);
+                if (existing != null) {
+                    existing.setTimestamp(LocalDateTime.now());
+                    if (metadata != null) existing.setMetadata(metadata);
+                    auditLogRepository.save(existing);
+                    return;
+                }
+            }
+
+            // 3. Insert fresh row (first occurrence in window OR mutation event)
             AuditLog entry = AuditLog.builder()
                     .username(username)
                     .userId(userId)
@@ -63,6 +94,28 @@ public class AuditService {
         } catch (Exception ex) {
             log.error("Failed to save audit log for action={} resource={}: {}", action, resource, ex.getMessage());
         }
+    }
+
+    /**
+     * Returns true if this action type can safely be upserted (collapsed) within
+     * the time window. Mutations and security-sensitive failures always insert
+     * fresh rows so the audit history captures every distinct occurrence.
+     */
+    private static boolean shouldUpsert(String action) {
+        if (action == null) return true;
+        // Security-relevant — must keep separate rows
+        if (action.equals("LOGIN_FAILED"))   return false;
+        if (action.equals("REGISTER"))       return false;
+        if (action.equals("USER_UPDATED"))   return false;
+        if (action.equals("USER_DELETED"))   return false;
+        if (action.equals("TOKEN_REFRESH"))  return false; // each refresh is a token rotation
+        // Mutation prefixes — each occurrence is a distinct change
+        if (action.startsWith("CREATE "))    return false;
+        if (action.startsWith("UPDATE "))    return false;
+        if (action.startsWith("DELETE "))    return false;
+        if (action.startsWith("MARK ALL "))  return false;
+        // Everything else (VIEW *, LOGIN_SUCCESS, LOGOUT, AUTH *) → upsert
+        return true;
     }
 
     // -------------------------------------------------------------------------

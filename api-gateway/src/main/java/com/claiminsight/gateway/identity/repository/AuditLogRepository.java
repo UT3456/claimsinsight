@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
 
@@ -16,6 +17,14 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
     Page<AuditLog> findByTimestampBetween(LocalDateTime from, LocalDateTime to, Pageable pageable);
 
     Page<AuditLog> findByAction(String action, Pageable pageable);
+
+    /**
+     * Returns the most-recent existing audit row matching the (username, action, resource)
+     * tuple whose timestamp is within the upsert window. Used by AuditService.log() to
+     * collapse repeated identical events into a single row whose timestamp is bumped.
+     */
+    Optional<AuditLog> findFirstByUsernameAndActionAndResourceAndTimestampAfterOrderByTimestampDesc(
+            String username, String action, String resource, LocalDateTime cutoff);
 
     /** Bulk delete entries older than the cutoff. Returns the number of rows removed. */
     @Modifying
