@@ -9,7 +9,8 @@ vi.mock('./axiosInstance', () => ({
 import axiosInstance from './axiosInstance';
 import { auditApi } from './auditApi';
 
-const get = axiosInstance.get as Mock;
+const get = axiosInstance.get    as Mock;
+const del = axiosInstance.delete as Mock;
 
 beforeEach(() => { vi.clearAllMocks(); });
 
@@ -80,5 +81,36 @@ describe('auditApi.getByDateRange()', () => {
     const result = await auditApi.getByDateRange('2026-01-01', '2026-01-31');
     expect(result[0].action).toBe('LOGIN');
     expect(result[0].username).toBe('alice');
+  });
+});
+
+// ── clearAll() — destructive admin action; verify exact endpoint ──────────
+describe('auditApi.clearAll()', () => {
+  it('DELETEs /audit/logs (no params) and returns the row count', async () => {
+    del.mockResolvedValueOnce({ data: { scope: 'all', removed: 8233 } });
+    const result = await auditApi.clearAll();
+    expect(del).toHaveBeenCalledWith('/audit/logs');
+    expect(result.removed).toBe(8233);
+    expect(result.scope).toBe('all');
+  });
+});
+
+// ── clearOlderThan() — bulk purge with cutoff timestamp ───────────────────
+describe('auditApi.clearOlderThan()', () => {
+  it('DELETEs /audit/logs with the olderThan ISO param', async () => {
+    del.mockResolvedValueOnce({ data: { scope: 'olderThan', olderThan: '2026-04-01T00:00:00', removed: 412 } });
+    const result = await auditApi.clearOlderThan('2026-04-01T00:00:00');
+    expect(del).toHaveBeenCalledWith('/audit/logs', { params: { olderThan: '2026-04-01T00:00:00' } });
+    expect(result.removed).toBe(412);
+  });
+});
+
+// ── deleteById() — surgical delete from per-row trash icon ────────────────
+describe('auditApi.deleteById()', () => {
+  it('DELETEs /audit/logs/:id', async () => {
+    del.mockResolvedValueOnce({ data: { id: 99, removed: true } });
+    const result = await auditApi.deleteById(99);
+    expect(del).toHaveBeenCalledWith('/audit/logs/99');
+    expect(result.removed).toBe(true);
   });
 });

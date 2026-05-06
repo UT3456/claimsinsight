@@ -80,6 +80,20 @@ describe('claimsApi.delete()', () => {
   });
 });
 
+// ── calculate() — admin "Recalculate KPIs" action ───────────────────────
+describe('claimsApi.calculate()', () => {
+  it('POSTs /kpis/calculate/:claimId and returns the recomputed KPI rows', async () => {
+    const recomputed = [
+      { ...kpi, kpiId: 10, metricName: 'TAT' },
+      { ...kpi, kpiId: 11, metricName: 'CYCLE_TIME' },
+    ];
+    post.mockResolvedValueOnce({ data: recomputed });
+    const result = await claimsApi.calculate('CLM-2026-AUTO-001');
+    expect(post).toHaveBeenCalledWith('/kpis/calculate/CLM-2026-AUTO-001');
+    expect(result).toHaveLength(2);
+  });
+});
+
 // ── Claim Status endpoints ────────────────────────────────────────────────────
 describe('claimsApi.getAllClaimStatuses()', () => {
   it('GETs /claim-status', async () => {

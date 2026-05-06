@@ -90,6 +90,23 @@ describe('setCredentials', () => {
     expect(stored.username).toBe('alice');
     expect(stored.role).toBe('ROLE_ADMIN');
   });
+
+  it('persists refreshToken to localStorage when provided in the response', () => {
+    const store = makeStore();
+    const payload: AuthResponse = {
+      ...makePayload(),
+      refreshToken: 'ref-token-uuid-abc',
+    };
+    store.dispatch(setCredentials(payload));
+    expect(localStorage.getItem('ci360_refresh')).toBe('ref-token-uuid-abc');
+  });
+
+  it('omits refreshToken when the backend response does not include one', () => {
+    const store = makeStore();
+    store.dispatch(setCredentials(makePayload()));
+    // Backend may not yet emit refreshToken — we should silently skip the write
+    expect(localStorage.getItem('ci360_refresh')).toBeNull();
+  });
 });
 
 // ── clearCredentials ──────────────────────────────────────────────────────────
@@ -124,6 +141,22 @@ describe('clearCredentials', () => {
     store.dispatch(clearCredentials());
     expect(localStorage.getItem('ci360_token')).toBeNull();
     expect(localStorage.getItem('ci360_user')).toBeNull();
+  });
+
+  it('also wipes the refreshToken on logout (security-critical — must not leak)', () => {
+    const store = makeStore();
+    store.dispatch(setCredentials({
+      accessToken: buildJwt(1),
+      refreshToken: 'ref-token-to-be-killed',
+      tokenType: 'Bearer',
+      expiresIn: 3600,
+      username: 'bob',
+      role: 'ROLE_ADMIN',
+    }));
+    expect(localStorage.getItem('ci360_refresh')).toBe('ref-token-to-be-killed');
+
+    store.dispatch(clearCredentials());
+    expect(localStorage.getItem('ci360_refresh')).toBeNull();
   });
 });
 
