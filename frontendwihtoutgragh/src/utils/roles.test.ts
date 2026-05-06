@@ -218,10 +218,11 @@ describe('hasAdminSectionAccess()', () => {
     expect(hasAdminSectionAccess(ROLES.CLAIMS_ANALYST)).toBe(true);
   });
 
-  it('returns true for FRAUD_ANALYST (still has /ingestion/raw read access)', () => {
-    // Audit logs got locked back to admin-only, but FRAUD_ANALYST still
-    // sees the Admin section because they read /ingestion/raw payloads.
-    expect(hasAdminSectionAccess(ROLES.FRAUD_ANALYST)).toBe(true);
+  it('returns false for FRAUD_ANALYST (no admin tabs at all)', () => {
+    // Fraud Analyst has no /ingestion/raw access (they investigate specific
+    // claims via Fraud & Risk), no audit log access (admin-only), no KPI
+    // config, no users. The Admin sidebar section is hidden entirely.
+    expect(hasAdminSectionAccess(ROLES.FRAUD_ANALYST)).toBe(false);
   });
 
   it('returns true for CLAIMS_MANAGER (has /ingestion/feeds + /admin/kpi-definitions)', () => {
