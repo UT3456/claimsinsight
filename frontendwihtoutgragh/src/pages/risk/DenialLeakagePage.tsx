@@ -1,25 +1,19 @@
 import { useEffect, useMemo, useReducer, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Table, Modal, Form, Input, Select, DatePicker, Alert, Popconfirm, Tooltip, Button, Dropdown,
-  App as AntApp,
+  Table, Alert, Popconfirm, Tooltip, Button,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import dayjs from 'dayjs';
-import { RefreshCw, Plus, Trash2, ChevronDown } from 'lucide-react';
+import { RefreshCw, Trash2 } from 'lucide-react';
 
 import {
-  PageHeader, KpiCard, DataCard, Badge, Chip, StatusDot, GhostButton, DarkButton, EmptyState,
+  PageHeader, KpiCard, DataCard, Badge, Chip, StatusDot, GhostButton, EmptyState,
 } from '../../components/ui';
 import type { BadgeTone, StatusTone } from '../../components/ui';
 import {
   denialPatternsApi, leakageFlagsApi, LEAKAGE_TYPES,
   type DenialPattern, type LeakageFlag,
-  type CreateDenialPatternRequest, type CreateLeakageFlagRequest,
 } from '../../api/denialLeakageApi';
-
-const { Option } = Select;
-const { TextArea } = Input;
 
 /**
  * DenialLeakagePage — reference screen #05.
@@ -35,9 +29,6 @@ interface State {
   loadingPatterns: boolean;
   loadingFlags: boolean;
   error: string | null;
-  patternModal: boolean;
-  flagModal: boolean;
-  submitting: boolean;
   tab: 'patterns' | 'flags';
   typeFilter: 'ALL' | typeof LEAKAGE_TYPES[number];
 }
@@ -48,14 +39,6 @@ type Action =
   | { type: 'FLAGS_START' }
   | { type: 'FLAGS_SUCCESS'; payload: LeakageFlag[] }
   | { type: 'FETCH_ERROR'; payload: string }
-  | { type: 'OPEN_PATTERN_MODAL' }
-  | { type: 'CLOSE_PATTERN_MODAL' }
-  | { type: 'OPEN_FLAG_MODAL' }
-  | { type: 'CLOSE_FLAG_MODAL' }
-  | { type: 'SUBMIT_START' }
-  | { type: 'PATTERN_CREATED'; payload: DenialPattern }
-  | { type: 'FLAG_CREATED'; payload: LeakageFlag }
-  | { type: 'SUBMIT_ERROR' }
   | { type: 'DELETE_PATTERN'; payload: number }
   | { type: 'DELETE_FLAG'; payload: number }
   | { type: 'SET_TAB'; payload: State['tab'] }
@@ -64,7 +47,7 @@ type Action =
 const initial: State = {
   patterns: [], flags: [],
   loadingPatterns: false, loadingFlags: false,
-  error: null, patternModal: false, flagModal: false, submitting: false,
+  error: null,
   tab: 'patterns', typeFilter: 'ALL',
 };
 
@@ -75,14 +58,6 @@ function reducer(s: State, a: Action): State {
     case 'FLAGS_START':         return { ...s, loadingFlags: true, error: null };
     case 'FLAGS_SUCCESS':       return { ...s, loadingFlags: false, flags: a.payload };
     case 'FETCH_ERROR':         return { ...s, loadingPatterns: false, loadingFlags: false, error: a.payload };
-    case 'OPEN_PATTERN_MODAL':  return { ...s, patternModal: true };
-    case 'CLOSE_PATTERN_MODAL': return { ...s, patternModal: false, submitting: false };
-    case 'OPEN_FLAG_MODAL':     return { ...s, flagModal: true };
-    case 'CLOSE_FLAG_MODAL':    return { ...s, flagModal: false, submitting: false };
-    case 'SUBMIT_START':        return { ...s, submitting: true };
-    case 'PATTERN_CREATED':     return { ...s, submitting: false, patternModal: false, patterns: [a.payload, ...s.patterns] };
-    case 'FLAG_CREATED':        return { ...s, submitting: false, flagModal: false, flags: [a.payload, ...s.flags] };
-    case 'SUBMIT_ERROR':        return { ...s, submitting: false };
     case 'DELETE_PATTERN':      return { ...s, patterns: s.patterns.filter(p => p.patternId !== a.payload) };
     case 'DELETE_FLAG':         return { ...s, flags: s.flags.filter(f => f.leakageId !== a.payload) };
     case 'SET_TAB':             return { ...s, tab: a.payload };
@@ -107,9 +82,6 @@ const fmtUSD = (n: number) =>
 export default function DenialLeakagePage() {
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(reducer, initial);
-  const [patternForm] = Form.useForm();
-  const [flagForm]    = Form.useForm();
-  const { message } = AntApp.useApp();
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
 
   const loadPatterns = useCallback(async () => {
@@ -127,44 +99,6 @@ export default function DenialLeakagePage() {
   }, []);
 
   useEffect(() => { loadPatterns(); loadFlags(); }, [loadPatterns, loadFlags]);
-
-  const handleCreatePattern = async (values: Record<string, unknown>) => {
-    dispatch({ type: 'SUBMIT_START' });
-    try {
-      const req: CreateDenialPatternRequest = {
-        claimId:        values.claimId as string,
-        denialCode:     values.denialCode as string,
-        reason:         values.reason as string,
-        occurrenceDate: (values.occurrenceDate as dayjs.Dayjs).format('YYYY-MM-DD'),
-      };
-      dispatch({ type: 'PATTERN_CREATED', payload: await denialPatternsApi.create(req) });
-      patternForm.resetFields();
-      message.success('Denial pattern added');
-    } catch (err) {
-      dispatch({ type: 'SUBMIT_ERROR' });
-      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to add denial pattern.';
-      message.error(msg);
-    }
-  };
-
-  const handleCreateFlag = async (values: Record<string, unknown>) => {
-    dispatch({ type: 'SUBMIT_START' });
-    try {
-      const req: CreateLeakageFlagRequest = {
-        claimId:        values.claimId as string,
-        leakageType:    values.leakageType as string,
-        estimatedLoss:  Number(values.estimatedLoss),
-        identifiedDate: (values.identifiedDate as dayjs.Dayjs).format('YYYY-MM-DD'),
-      };
-      dispatch({ type: 'FLAG_CREATED', payload: await leakageFlagsApi.create(req) });
-      flagForm.resetFields();
-      message.success('Leakage flag added');
-    } catch (err) {
-      dispatch({ type: 'SUBMIT_ERROR' });
-      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to add leakage flag.';
-      message.error(msg);
-    }
-  };
 
   // ── Derived data ─────────────────────────────────────────────────────────
   const totalLeakage = state.flags.reduce((s, f) => s + (f.estimatedLoss ?? 0), 0);
@@ -281,18 +215,6 @@ export default function DenialLeakagePage() {
             <GhostButton onClick={() => { loadPatterns(); loadFlags(); }} icon={<RefreshCw size={12} strokeWidth={1.8} />}>
               Refresh
             </GhostButton>
-            <Dropdown
-              menu={{
-                items: [
-                  { key: 'pattern', label: 'Add denial pattern', onClick: () => dispatch({ type: 'OPEN_PATTERN_MODAL' }) },
-                  { key: 'flag',    label: 'Add leakage flag',  onClick: () => dispatch({ type: 'OPEN_FLAG_MODAL' }) },
-                ],
-              }}
-            >
-              <DarkButton icon={<Plus size={12} strokeWidth={2} />}>
-                Add <ChevronDown size={11} strokeWidth={2} style={{ marginLeft: 2 }} />
-              </DarkButton>
-            </Dropdown>
           </>
         }
       />
@@ -362,59 +284,6 @@ export default function DenialLeakagePage() {
         )}
       </DataCard>
 
-      {/* Pattern modal */}
-      <Modal
-        title="Add denial pattern"
-        open={state.patternModal}
-        onCancel={() => { dispatch({ type: 'CLOSE_PATTERN_MODAL' }); patternForm.resetFields(); }}
-        onOk={() => patternForm.submit()}
-        confirmLoading={state.submitting}
-        okText="Add pattern"
-        destroyOnClose
-      >
-        <Form form={patternForm} layout="vertical" onFinish={handleCreatePattern}>
-          <Form.Item name="claimId" label="Claim ID" rules={[{ required: true }]}>
-            <Input placeholder="CLM-2026-AUTO-001" />
-          </Form.Item>
-          <Form.Item name="denialCode" label="Denial code" rules={[{ required: true }]}>
-            <Input placeholder="D001" />
-          </Form.Item>
-          <Form.Item name="reason" label="Reason" rules={[{ required: true }]}>
-            <TextArea rows={3} placeholder="Describe the denial reason…" />
-          </Form.Item>
-          <Form.Item name="occurrenceDate" label="Occurrence date" rules={[{ required: true }]}>
-            <DatePicker style={{ width: '100%' }} />
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* Flag modal */}
-      <Modal
-        title="Add leakage flag"
-        open={state.flagModal}
-        onCancel={() => { dispatch({ type: 'CLOSE_FLAG_MODAL' }); flagForm.resetFields(); }}
-        onOk={() => flagForm.submit()}
-        confirmLoading={state.submitting}
-        okText="Add flag"
-        destroyOnClose
-      >
-        <Form form={flagForm} layout="vertical" onFinish={handleCreateFlag}>
-          <Form.Item name="claimId" label="Claim ID" rules={[{ required: true }]}>
-            <Input placeholder="CLM-2026-AUTO-001" />
-          </Form.Item>
-          <Form.Item name="leakageType" label="Leakage type" rules={[{ required: true }]}>
-            <Select placeholder="Select type">
-              {LEAKAGE_TYPES.map(t => <Option key={t} value={t}>{t}</Option>)}
-            </Select>
-          </Form.Item>
-          <Form.Item name="estimatedLoss" label="Estimated loss ($)" rules={[{ required: true }]}>
-            <Input type="number" min={0.01} step={0.01} placeholder="5000.00" />
-          </Form.Item>
-          <Form.Item name="identifiedDate" label="Identified date" rules={[{ required: true }]}>
-            <DatePicker style={{ width: '100%' }} />
-          </Form.Item>
-        </Form>
-      </Modal>
     </div>
   );
 }

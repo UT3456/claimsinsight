@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useReducer, useCallback } from 'react';
 import {
-  Table, Modal, Form, Input, Select, DatePicker, Alert, Tooltip, Popconfirm, Button, Dropdown,
+  Table, Alert, Tooltip, Popconfirm, Button, Dropdown,
   App as AntApp,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { MenuProps } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import dayjs from 'dayjs';
-import { Plus, Trash2, ChevronDown, ShieldAlert } from 'lucide-react';
+import { Trash2, ShieldAlert } from 'lucide-react';
 
 import {
   PageHeader, KpiCard, DataCard, Badge, Chip, GhostButton, EmptyState, CHART,
@@ -15,12 +14,9 @@ import {
 import {
   riskScoresApi, riskIndicatorsApi,
   type RiskScore, type RiskIndicator,
-  type CreateRiskScoreRequest, type CreateRiskIndicatorRequest,
-  INDICATOR_TYPES, SEVERITIES,
+  INDICATOR_TYPES,
 } from '../../api/fraudRiskApi';
 import { investigationsApi } from '../../api/investigationsApi';
-
-const { Option } = Select;
 
 /**
  * FraudRiskPage — reference screen #04 "Fraud & risk".
@@ -45,9 +41,6 @@ interface State {
   loadingScores: boolean;
   loadingIndicators: boolean;
   error: string | null;
-  scoreModal: boolean;
-  indicatorModal: boolean;
-  submitting: boolean;
   filterScore: FilterScore;
   filterIndicator: FilterIndicator;
   filterPeriod: FilterPeriod;
@@ -59,14 +52,6 @@ type Action =
   | { type: 'INDICATORS_START' }
   | { type: 'INDICATORS_OK'; payload: RiskIndicator[] }
   | { type: 'ERROR'; payload: string }
-  | { type: 'OPEN_SCORE' }
-  | { type: 'CLOSE_SCORE' }
-  | { type: 'OPEN_INDICATOR' }
-  | { type: 'CLOSE_INDICATOR' }
-  | { type: 'SUBMIT_START' }
-  | { type: 'SCORE_CREATED'; payload: RiskScore }
-  | { type: 'INDICATOR_CREATED'; payload: RiskIndicator }
-  | { type: 'SUBMIT_ERROR' }
   | { type: 'DELETE_SCORE'; payload: number }
   | { type: 'DELETE_INDICATOR'; payload: number }
   | { type: 'SET_FS'; payload: FilterScore }
@@ -77,7 +62,6 @@ const initial: State = {
   scores: [], indicators: [],
   loadingScores: false, loadingIndicators: false,
   error: null,
-  scoreModal: false, indicatorModal: false, submitting: false,
   filterScore: 'GTE_70', filterIndicator: 'ALL', filterPeriod: 'D7',
 };
 
@@ -88,14 +72,6 @@ function reducer(s: State, a: Action): State {
     case 'INDICATORS_START':   return { ...s, loadingIndicators: true, error: null };
     case 'INDICATORS_OK':      return { ...s, loadingIndicators: false, indicators: a.payload };
     case 'ERROR':              return { ...s, loadingScores: false, loadingIndicators: false, error: a.payload };
-    case 'OPEN_SCORE':         return { ...s, scoreModal: true };
-    case 'CLOSE_SCORE':        return { ...s, scoreModal: false, submitting: false };
-    case 'OPEN_INDICATOR':     return { ...s, indicatorModal: true };
-    case 'CLOSE_INDICATOR':    return { ...s, indicatorModal: false, submitting: false };
-    case 'SUBMIT_START':       return { ...s, submitting: true };
-    case 'SCORE_CREATED':      return { ...s, submitting: false, scoreModal: false, scores: [a.payload, ...s.scores] };
-    case 'INDICATOR_CREATED':  return { ...s, submitting: false, indicatorModal: false, indicators: [a.payload, ...s.indicators] };
-    case 'SUBMIT_ERROR':       return { ...s, submitting: false };
     case 'DELETE_SCORE':       return { ...s, scores: s.scores.filter(x => x.scoreId !== a.payload) };
     case 'DELETE_INDICATOR':   return { ...s, indicators: s.indicators.filter(x => x.indicatorId !== a.payload) };
     case 'SET_FS':             return { ...s, filterScore: a.payload };
@@ -136,8 +112,6 @@ const PERIOD_DAYS: Record<FilterPeriod, number> = { D7: 7, D30: 30, D90: 90 };
 export default function FraudRiskPage() {
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(reducer, initial);
-  const [scoreForm]     = Form.useForm();
-  const [indicatorForm] = Form.useForm();
   const { message } = AntApp.useApp();
 
   const loadScores = useCallback(async () => {
@@ -153,43 +127,6 @@ export default function FraudRiskPage() {
   }, []);
 
   useEffect(() => { loadScores(); loadIndicators(); }, [loadScores, loadIndicators]);
-
-  const handleCreateScore = async (values: Record<string, unknown>) => {
-    dispatch({ type: 'SUBMIT_START' });
-    try {
-      const req: CreateRiskScoreRequest = {
-        claimId:      values.claimId as string,
-        scoreValue:   Number(values.scoreValue),
-        computedDate: (values.computedDate as dayjs.Dayjs).format('YYYY-MM-DD'),
-      };
-      dispatch({ type: 'SCORE_CREATED', payload: await riskScoresApi.create(req) });
-      scoreForm.resetFields();
-      message.success('Risk score added');
-    } catch (err) {
-      dispatch({ type: 'SUBMIT_ERROR' });
-      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to add risk score.';
-      message.error(msg);
-    }
-  };
-
-  const handleCreateIndicator = async (values: Record<string, unknown>) => {
-    dispatch({ type: 'SUBMIT_START' });
-    try {
-      const req: CreateRiskIndicatorRequest = {
-        claimId:       values.claimId as string,
-        indicatorType: values.indicatorType as string,
-        severity:      values.severity as string,
-        triggeredDate: (values.triggeredDate as dayjs.Dayjs).format('YYYY-MM-DD'),
-      };
-      dispatch({ type: 'INDICATOR_CREATED', payload: await riskIndicatorsApi.create(req) });
-      indicatorForm.resetFields();
-      message.success('Risk indicator added');
-    } catch (err) {
-      dispatch({ type: 'SUBMIT_ERROR' });
-      const msg = (err as { userMessage?: string }).userMessage ?? 'Failed to add risk indicator.';
-      message.error(msg);
-    }
-  };
 
   // ── Escalate SIU ──────────────────────────────────────────────────────────
   // Opens a fraud investigation on the selected claim. Backend persists the
@@ -289,13 +226,6 @@ export default function FraudRiskPage() {
     selectedKeys: [state.filterPeriod],
     onClick: ({ key }) => dispatch({ type: 'SET_FP', payload: key as FilterPeriod }),
   };
-
-  // ── Add menu (admin actions) ─────────────────────────────────────────────
-
-  const addMenu: MenuProps['items'] = [
-    { key: 'score',     label: 'Add risk score',     onClick: () => dispatch({ type: 'OPEN_SCORE' }) },
-    { key: 'indicator', label: 'Add risk indicator', onClick: () => dispatch({ type: 'OPEN_INDICATOR' }) },
-  ];
 
   // ── Table columns ────────────────────────────────────────────────────────
 
@@ -470,15 +400,7 @@ export default function FraudRiskPage() {
         title="High-risk claim queue"
         subtitle={`${filteredQueue.length} matching claim${filteredQueue.length === 1 ? '' : 's'}`}
         headerRight={
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <GhostButton onClick={() => { loadScores(); loadIndicators(); }}>Refresh</GhostButton>
-            <Dropdown menu={{ items: addMenu }} trigger={['click']}>
-              <button style={styles.darkAdd}>
-                <Plus size={12} strokeWidth={2} />
-                Add <ChevronDown size={11} strokeWidth={1.8} />
-              </button>
-            </Dropdown>
-          </div>
+          <GhostButton onClick={() => { loadScores(); loadIndicators(); }}>Refresh</GhostButton>
         }
         padding={0}
       >
@@ -504,54 +426,6 @@ export default function FraudRiskPage() {
           />
         )}
       </DataCard>
-
-      {/* Modals (preserved from original) */}
-      <Modal
-        title="Add risk score"
-        open={state.scoreModal}
-        onCancel={() => { dispatch({ type: 'CLOSE_SCORE' }); scoreForm.resetFields(); }}
-        onOk={() => scoreForm.submit()} confirmLoading={state.submitting}
-        okText="Add score" destroyOnClose
-      >
-        <Form form={scoreForm} layout="vertical" onFinish={handleCreateScore}>
-          <Form.Item name="claimId" label="Claim ID" rules={[{ required: true }]}>
-            <Input placeholder="CLM-2026-AUTO-001" />
-          </Form.Item>
-          <Form.Item name="scoreValue" label="Score (0–100)" rules={[{ required: true }]}>
-            <Input type="number" min={0} max={100} step={0.1} placeholder="75.5" />
-          </Form.Item>
-          <Form.Item name="computedDate" label="Computed date" rules={[{ required: true }]}>
-            <DatePicker style={{ width: '100%' }} />
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      <Modal
-        title="Add risk indicator"
-        open={state.indicatorModal}
-        onCancel={() => { dispatch({ type: 'CLOSE_INDICATOR' }); indicatorForm.resetFields(); }}
-        onOk={() => indicatorForm.submit()} confirmLoading={state.submitting}
-        okText="Add indicator" destroyOnClose
-      >
-        <Form form={indicatorForm} layout="vertical" onFinish={handleCreateIndicator}>
-          <Form.Item name="claimId" label="Claim ID" rules={[{ required: true }]}>
-            <Input placeholder="CLM-2026-AUTO-001" />
-          </Form.Item>
-          <Form.Item name="indicatorType" label="Indicator type" rules={[{ required: true }]}>
-            <Select placeholder="Select type">
-              {INDICATOR_TYPES.map(t => <Option key={t} value={t}>{t}</Option>)}
-            </Select>
-          </Form.Item>
-          <Form.Item name="severity" label="Severity" rules={[{ required: true }]}>
-            <Select placeholder="Select severity">
-              {SEVERITIES.map(s => <Option key={s} value={s}>{s}</Option>)}
-            </Select>
-          </Form.Item>
-          <Form.Item name="triggeredDate" label="Triggered date" rules={[{ required: true }]}>
-            <DatePicker style={{ width: '100%' }} />
-          </Form.Item>
-        </Form>
-      </Modal>
     </div>
   );
 }
@@ -575,16 +449,4 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 4, overflow: 'hidden',
   },
   barFill: { height: '100%', borderRadius: 4, transition: 'width 0.3s' },
-  darkAdd: {
-    // High-contrast inverted button. Uses theme variables so the foreground
-    // color of the page becomes the background of the button — works in
-    // both light (dark btn on light page) and dark (light btn on dark page).
-    display: 'inline-flex', alignItems: 'center', gap: 4,
-    padding: '5px 10px', borderRadius: 'var(--ci-radius-btn)',
-    fontSize: 11, fontWeight: 500,
-    background: 'var(--ci-text-primary)',
-    border: '1px solid var(--ci-text-primary)',
-    color: 'var(--ci-bg-app)',
-    cursor: 'pointer',
-  },
 };
