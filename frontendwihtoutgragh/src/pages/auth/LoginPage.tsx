@@ -20,13 +20,6 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-/** Demo credentials matching seed_data.sql — clicking a chip auto-fills the form. */
-const DEMO_USERS = [
-  { user: 'admin_alice',   role: 'Admin' },
-  { user: 'sarah_analyst', role: 'Analyst' },
-  { user: 'priya_fraud',   role: 'Fraud' },
-];
-
 export default function LoginPage() {
   const navigate  = useNavigate();
   const dispatch  = useDispatch();
@@ -36,17 +29,11 @@ export default function LoginPage() {
   const {
     control,
     handleSubmit,
-    setValue,
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { username: '', password: '', remember: true },
   });
-
-  const fillDemo = (username: string) => {
-    setValue('username', username, { shouldValidate: true });
-    setValue('password', 'Password1!', { shouldValidate: true });
-  };
 
   const onSubmit = async (values: LoginFormValues) => {
     setLoading(true);
@@ -116,27 +103,6 @@ export default function LoginPage() {
 
           <h2 className="auth-title">Welcome back</h2>
           <p className="auth-subtitle">Sign in to your workspace to continue</p>
-
-          {/* Demo quick-fill */}
-          <div className="auth-demo">
-            <div className="auth-demo-title">
-              <Shield size={11} strokeWidth={2.2} /> Try a demo account
-            </div>
-            <div className="auth-demo-grid">
-              {DEMO_USERS.map(d => (
-                <button
-                  key={d.user}
-                  type="button"
-                  className="auth-demo-chip"
-                  onClick={() => fillDemo(d.user)}
-                >
-                  <span className="auth-demo-chip-role">{d.role}</span>
-                  <span className="auth-demo-chip-user">{d.user}</span>
-                </button>
-              ))}
-            </div>
-            <div className="auth-demo-hint">password: Password1!</div>
-          </div>
 
           {apiError && (
             <Alert
