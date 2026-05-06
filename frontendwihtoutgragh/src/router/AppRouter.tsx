@@ -6,6 +6,7 @@ import RoleRoute                   from './RoleRoute';
 import AppLayout                   from '../layouts/AppLayout';
 
 // ── Lazy-loaded pages ─────────────────────────────────────────────────────────
+const LandingPage       = lazy(() => import('../pages/landing/LandingPage'));
 const LoginPage         = lazy(() => import('../pages/auth/LoginPage'));
 const RegisterPage      = lazy(() => import('../pages/auth/RegisterPage'));
 const Dashboard         = lazy(() => import('../pages/dashboard/Dashboard'));
@@ -54,6 +55,7 @@ export default function AppRouter() {
       <Routes>
 
         {/* ── Public ── */}
+        <Route path="/"         element={<LandingPage />}  />
         <Route path="/login"    element={<LoginPage />}    />
         <Route path="/register" element={<RegisterPage />} />
 
@@ -112,8 +114,10 @@ export default function AppRouter() {
         </Route>
 
         {/* ── Fallback ── */}
-        <Route path="/"  element={<Navigate to="/dashboard" replace />} />
-        <Route path="*"  element={<Navigate to="/login"     replace />} />
+        {/* "/" is now handled by LandingPage above (public marketing page).
+            Any unmatched path goes to the landing rather than login so a
+            stray bookmark doesn't pull the user into the auth flow. */}
+        <Route path="*"  element={<Navigate to="/" replace />} />
 
       </Routes>
     </Suspense>
