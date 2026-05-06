@@ -114,9 +114,9 @@ public class SecurityConfig {
                         .pathMatchers("/api/notifications/**").authenticated()
 
                         // ── Audit Logs ──────────────────────────────────────────────────
-                        // Admin (full) + Fraud Analyst (read) for internal investigations
-                        .pathMatchers(HttpMethod.GET, "/api/audit/**").hasAnyAuthority(
-                                "ROLE_ADMIN", "ROLE_FRAUD_ANALYST")
+                        // ADMIN ONLY — read AND write. The audit trail is too sensitive
+                        // to surface to investigators directly; if a Fraud Analyst needs
+                        // to see specific entries, an admin should pull them.
                         .pathMatchers("/api/audit/**").hasAuthority("ROLE_ADMIN")
 
                         // ── KPI definitions (read-only catalog hits /api/kpis) ──────────

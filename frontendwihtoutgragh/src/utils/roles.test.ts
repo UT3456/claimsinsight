@@ -65,11 +65,8 @@ describe('ROUTE_ROLES', () => {
     expect(ROUTE_ROLES['/admin/users']).toEqual([ROLES.ADMIN]);
   });
 
-  it('grants /admin/audit-logs read access to FRAUD_ANALYST + ADMIN', () => {
-    const allowed = ROUTE_ROLES['/admin/audit-logs'];
-    expect(allowed).toContain(ROLES.FRAUD_ANALYST);
-    expect(allowed).toContain(ROLES.ADMIN);
-    expect(allowed).not.toContain(ROLES.CLAIMS_ANALYST);
+  it('locks /admin/audit-logs to ADMIN only — no other role may even view it', () => {
+    expect(ROUTE_ROLES['/admin/audit-logs']).toEqual([ROLES.ADMIN]);
   });
 
   it('opens /ingestion/feeds to Manager (read) + Analyst + Admin', () => {
@@ -186,9 +183,9 @@ describe('canEdit()', () => {
     expect(canEdit(ROLES.CLAIMS_MANAGER,   '/ingestion/feeds')).toBe(false);
   });
 
-  it('returns false for FRAUD_ANALYST on /admin/audit-logs (read-only viewer)', () => {
-    // Fraud analysts can READ audit logs for investigations, but never Clear them.
-    expect(canAccess(ROLES.FRAUD_ANALYST, '/admin/audit-logs')).toBe(true);
+  it('returns false for FRAUD_ANALYST on /admin/audit-logs (cannot view at all)', () => {
+    // Audit logs are admin-only — fraud analysts never see them.
+    expect(canAccess(ROLES.FRAUD_ANALYST, '/admin/audit-logs')).toBe(false);
     expect(canEdit(ROLES.FRAUD_ANALYST,   '/admin/audit-logs')).toBe(false);
   });
 
@@ -221,7 +218,9 @@ describe('hasAdminSectionAccess()', () => {
     expect(hasAdminSectionAccess(ROLES.CLAIMS_ANALYST)).toBe(true);
   });
 
-  it('returns true for FRAUD_ANALYST (has /ingestion/raw + /admin/audit-logs)', () => {
+  it('returns true for FRAUD_ANALYST (still has /ingestion/raw read access)', () => {
+    // Audit logs got locked back to admin-only, but FRAUD_ANALYST still
+    // sees the Admin section because they read /ingestion/raw payloads.
     expect(hasAdminSectionAccess(ROLES.FRAUD_ANALYST)).toBe(true);
   });
 

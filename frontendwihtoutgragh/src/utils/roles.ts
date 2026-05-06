@@ -42,7 +42,7 @@ export const ROUTE_ROLES: Record<string, AppRole[]> = {
   '/ingestion/feeds':       [ROLES.CLAIMS_ANALYST, ROLES.CLAIMS_MANAGER, ROLES.ADMIN],
   '/ingestion/raw':         [ROLES.CLAIMS_ANALYST, ROLES.FRAUD_ANALYST, ROLES.ADMIN],
   '/admin/kpi-definitions': [ROLES.CLAIMS_MANAGER, ROLES.ACTUARY, ROLES.OPERATIONS_EXEC, ROLES.ADMIN],
-  '/admin/audit-logs':      [ROLES.FRAUD_ANALYST, ROLES.ADMIN],
+  '/admin/audit-logs':      [ROLES.ADMIN],
   '/admin/users':           [ROLES.ADMIN],
 
   '/adjusters':        [ROLES.CLAIMS_MANAGER, ROLES.OPERATIONS_EXEC, ROLES.ADMIN],
