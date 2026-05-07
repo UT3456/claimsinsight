@@ -11,6 +11,7 @@ import { ingestApi }                      from '../../../api/dataIngestionApi';
 import { claimsApi }                      from '../../../api/claimsApi';
 import { denialPatternsApi }              from '../../../api/denialLeakageApi';
 import { costsApi }                       from '../../../api/financialApi';
+import { settledArray }                   from '../../../utils/settled';
 
 /**
  * AnalystDashboard — first-screen view for ROLE_CLAIMS_ANALYST.
@@ -82,12 +83,12 @@ export default function AnalystDashboard() {
         denialPatternsApi.getAll(),
         costsApi.getAll(),
       ]);
-      const raw      = rawR.status    === 'fulfilled' ? rawR.value    : [];
-      const sevs     = sevR.status    === 'fulfilled' ? sevR.value    : [];
-      const losses   = lossR.status   === 'fulfilled' ? lossR.value   : [];
-      const freqs    = freqR.status   === 'fulfilled' ? freqR.value   : [];
-      const denials  = denialR.status === 'fulfilled' ? denialR.value : [];
-      const costs    = costR.status   === 'fulfilled' ? costR.value   : [];
+      const raw      = settledArray<{ ingestedDate: string }>(rawR);
+      const sevs     = settledArray<{ metricValue: number }>(sevR);
+      const losses   = settledArray<{ metricValue: number }>(lossR);
+      const freqs    = settledArray<{ metricValue: number }>(freqR);
+      const denials  = settledArray<{ reason: string; occurrenceDate: string }>(denialR);
+      const costs    = settledArray<{ costType: string; amount: number }>(costR);
 
       // ── Denial trend over last 8 weeks ─────────────────────────────────
       const bins = new Map<string, number>();

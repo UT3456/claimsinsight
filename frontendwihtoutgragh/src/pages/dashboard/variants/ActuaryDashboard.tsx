@@ -11,6 +11,7 @@ import { useAuth } from '../../../hooks/useAuth';
 
 import { claimsApi } from '../../../api/claimsApi';
 import { reservesApi, costsApi, agingApi } from '../../../api/financialApi';
+import { settledArray } from '../../../utils/settled';
 
 /**
  * ActuaryDashboard — first-screen view for ROLE_ACTUARY.
@@ -97,12 +98,14 @@ export default function ActuaryDashboard() {
         costsApi.getAll(),
         agingApi.getDistribution(),
       ]);
-      const sevs   = sevR.status   === 'fulfilled' ? sevR.value   : [];
-      const freqs  = freqR.status  === 'fulfilled' ? freqR.value  : [];
-      const losses = lossR.status  === 'fulfilled' ? lossR.value  : [];
-      const reserves = resR.status === 'fulfilled' ? resR.value   : [];
-      const costs    = costR.status === 'fulfilled' ? costR.value : [];
-      const aging    = agingR.status === 'fulfilled' ? agingR.value : [];
+      // Defensive: settledArray() coerces non-array responses to [] so
+      // `for (const x of …)` never throws "not iterable".
+      const sevs     = settledArray<{ metricDate: string; metricValue: number }>(sevR);
+      const freqs    = settledArray<{ metricValue: number }>(freqR);
+      const losses   = settledArray<{ metricValue: number }>(lossR);
+      const reserves = settledArray<{ claimId: string; reserveAmount: number }>(resR);
+      const costs    = settledArray<{ claimId: string; amount: number }>(costR);
+      const aging    = settledArray<{ agingBucket: string; count: number }>(agingR);
 
       // ── Severity trend (last 6 months) ─────────────────────────────────
       const months: { key: string; vals: number[] }[] = [];
@@ -170,7 +173,15 @@ export default function ActuaryDashboard() {
         },
       });
     } catch (err) {
-      dispatch({ type: 'ERR', payload: (err as { userMessage?: string }).userMessage ?? 'Failed to load dashboard.' });
+      // Surface the real error so we can debug, not just a blanket toast.
+      // The Actuary dashboard fans out to 6 services; any one of them
+      // returning a malformed shape used to trigger a top-level catch with
+      // no clue as to which call broke. Now the stack lands in DevTools.
+      // eslint-disable-next-line no-console
+      console.error('[ActuaryDashboard] load failed:', err);
+      const msg = (err as { userMessage?: string }).userMessage
+                ?? (err instanceof Error ? err.message : 'Failed to load dashboard.');
+      dispatch({ type: 'ERR', payload: msg });
     }
   }, []);
 

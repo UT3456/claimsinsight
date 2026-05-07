@@ -11,6 +11,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { riskScoresApi, riskIndicatorsApi } from '../../../api/fraudRiskApi';
 import { investigationsApi }                from '../../../api/investigationsApi';
 import type { RiskScore }                   from '../../../api/fraudRiskApi';
+import { settledArray }                     from '../../../utils/settled';
 
 /**
  * FraudDashboard — first-screen view for ROLE_FRAUD_ANALYST.
@@ -78,10 +79,10 @@ export default function FraudDashboard() {
         investigationsApi.getAll('NEW'),
         investigationsApi.getAll('UNDER_REVIEW'),
       ]);
-      const scores      = scoresR.status === 'fulfilled' ? scoresR.value : [];
-      const indicators  = indR.status    === 'fulfilled' ? indR.value    : [];
-      const invNew      = invNewR.status === 'fulfilled' ? invNewR.value : [];
-      const invReview   = invReviewR.status === 'fulfilled' ? invReviewR.value : [];
+      const scores      = settledArray<RiskScore>(scoresR);
+      const indicators  = settledArray<{ indicatorType: string; triggeredDate: string }>(indR);
+      const invNew      = settledArray<unknown>(invNewR);
+      const invReview   = settledArray<unknown>(invReviewR);
 
       // ── Histogram (portfolio fraud exposure at a glance) ───────────────
       const buckets: { bucket: string; count: number; tone: 'good' | 'ok' | 'warn' | 'danger' }[] = [

@@ -14,6 +14,7 @@ import { ingestApi }      from '../../../api/dataIngestionApi';
 import { claimsApi }      from '../../../api/claimsApi';
 import { adjustersApi, slaApi } from '../../../api/adjustersApi';
 import type { AdjusterPerformance } from '../../../api/adjustersApi';
+import { settledArray }   from '../../../utils/settled';
 
 /**
  * ManagerDashboard — first-screen view for ROLE_CLAIMS_MANAGER.
@@ -86,11 +87,11 @@ export default function ManagerDashboard() {
         adjustersApi.getAll(),
         slaApi.getAll(),
       ]);
-      const raw       = rawR.status === 'fulfilled' ? rawR.value : [];
-      const tats      = tatR.status === 'fulfilled' ? tatR.value : [];
-      const cycles    = cycR.status === 'fulfilled' ? cycR.value : [];
-      const adjusters = adjR.status === 'fulfilled' ? adjR.value : [];
-      const slas      = slaR.status === 'fulfilled' ? slaR.value : [];
+      const raw       = settledArray<unknown>(rawR);
+      const tats      = settledArray<{ metricDate: string; metricValue: number }>(tatR);
+      const cycles    = settledArray<{ metricValue: number }>(cycR);
+      const adjusters = settledArray<AdjusterPerformance>(adjR);
+      const slas      = settledArray<unknown>(slaR);
 
       // ── Weekly TAT trend (last 8 weeks) ─────────────────────────────
       const buckets = new Map<string, number[]>();

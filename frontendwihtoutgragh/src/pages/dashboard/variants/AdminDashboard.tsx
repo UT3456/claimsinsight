@@ -8,9 +8,10 @@ import {
 } from '../../../components/ui';
 import type { BadgeTone } from '../../../components/ui';
 
-import { usersApi }    from '../../../api/usersApi';
+import { usersApi, type User }    from '../../../api/usersApi';
 import { feedsApi }    from '../../../api/dataIngestionApi';
 import { auditApi }    from '../../../api/auditApi';
+import { settledArray } from '../../../utils/settled';
 import { ROLE_LABELS } from '../../../utils/roles';
 import type { AppRole } from '../../../utils/roles';
 
@@ -70,8 +71,9 @@ export default function AdminDashboard() {
         feedsApi.getAll(),
         auditApi.getLogs(0, 10),
       ]);
-      const users = usersR.status === 'fulfilled' ? usersR.value : [];
-      const feeds = feedsR.status === 'fulfilled' ? feedsR.value : [];
+      const users = settledArray<User>(usersR);
+      const feeds = settledArray<{ feedId: number; sourceSystem: string; feedType: string; status: string; lastSyncDate: string | null }>(feedsR);
+      // auditR is a Page object (not array) — keep as-is.
       const audit = auditR.status === 'fulfilled' ? auditR.value : null;
 
       // ── User role breakdown ────────────────────────────────────────────

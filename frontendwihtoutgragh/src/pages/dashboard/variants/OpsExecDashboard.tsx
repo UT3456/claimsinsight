@@ -11,6 +11,7 @@ import { ingestApi }            from '../../../api/dataIngestionApi';
 import { claimsApi }            from '../../../api/claimsApi';
 import { adjustersApi, slaApi } from '../../../api/adjustersApi';
 import { agingApi }             from '../../../api/financialApi';
+import { settledArray }         from '../../../utils/settled';
 
 /**
  * OpsExecDashboard — first-screen view for ROLE_OPERATIONS_EXEC.
@@ -82,13 +83,13 @@ export default function OpsExecDashboard() {
         slaApi.getAll(),
         agingApi.getDistribution(),
       ]);
-      const raw       = rawR.status     === 'fulfilled' ? rawR.value     : [];
-      const losses    = lossR.status    === 'fulfilled' ? lossR.value    : [];
-      const tats      = tatR.status     === 'fulfilled' ? tatR.value     : [];
-      const settles   = settleR.status  === 'fulfilled' ? settleR.value  : [];
-      const adjusters = adjR.status     === 'fulfilled' ? adjR.value     : [];
-      const slas      = slaR.status     === 'fulfilled' ? slaR.value     : [];
-      const aging     = agingR.status   === 'fulfilled' ? agingR.value   : [];
+      const raw       = settledArray<unknown>(rawR);
+      const losses    = settledArray<{ metricValue: number; metricDate: string }>(lossR);
+      const tats      = settledArray<{ metricValue: number; metricDate: string }>(tatR);
+      const settles   = settledArray<unknown>(settleR);
+      const adjusters = settledArray<{ slaMetCount?: number; slaBreachedCount?: number }>(adjR);
+      const slas      = settledArray<unknown>(slaR);
+      const aging     = settledArray<{ agingBucket: string; count: number }>(agingR);
 
       // ── KPIs ───────────────────────────────────────────────────────────
       const lossRatio = mean(losses.map(l => l.metricValue));
