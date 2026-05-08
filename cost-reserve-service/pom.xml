@@ -55,6 +55,15 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- Actuator — required so management.zipkin.tracing.* properties are
+             actually picked up and so /actuator/health works for service
+             discovery / health-check probes. Every other service in the
+             platform has this; cost-reserve-service was missing it. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- Cache -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
